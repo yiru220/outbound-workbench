@@ -1611,24 +1611,28 @@ function init() {
     calls = saved ? JSON.parse(saved) : [];
   } catch(e) { calls = []; }
 
-  // Load user mapping (owner_id -> name) from user_map.json
+  // Load user mapping (owner_id -> name) from user_map.json, then build dropdown
+  function buildUserDropdown() {
+    const select = document.getElementById('userSelect');
+    select.innerHTML = '';
+    const names = Array.from(new Set(Object.values(USER_MAP).filter(Boolean)));
+    const src = names.length ? names : TEAM;
+    src.forEach(n => {
+      const opt = document.createElement('option');
+      opt.value = n; opt.textContent = n;
+      select.appendChild(opt);
+    });
+    select.onchange = () => {
+      document.getElementById('loginBtn').disabled = !select.value;
+    };
+    document.getElementById('loginBtn').onclick = login;
+  }
   try {
     fetch('./user_map.json').then(r => r.ok ? r.json() : null).then(m => {
       if (m && typeof m === 'object') USER_MAP = m;
-    }).catch(() => {});
-  } catch(e) {}
-
-  // Populate user dropdown
-  const select = document.getElementById('userSelect');
-  TEAM.forEach(m => {
-    const opt = document.createElement('option');
-    opt.value = m; opt.textContent = m;
-    select.appendChild(opt);
-  });
-  select.onchange = () => {
-    document.getElementById('loginBtn').disabled = !select.value;
-  };
-  document.getElementById('loginBtn').onclick = login;
+      buildUserDropdown();
+    }).catch(() => { buildUserDropdown(); });
+  } catch(e) { buildUserDropdown(); }
   document.getElementById('searchInput').oninput = renderLeads;
 
   // Restore GitHub token
