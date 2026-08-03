@@ -365,6 +365,14 @@
       <div class="status-indicator" id="ghStatus">
         <span class="dot gray"></span> 未配置
       </div>
+      <hr style="margin:14px 0;border:none;border-top:1px solid var(--border);">
+      <label>回传代理地址（解决跨域）</label>
+      <input type="text" id="proxyUrl" placeholder="https://xxxx.workers.dev">
+      <div class="help-text">
+        企业微信接口禁止浏览器直连，需一个代理转发回传请求。<br>
+        部署方法见仓库 <code>proxy/README.md</code>（Cloudflare Worker，免费）。<br>
+        部署后把 Worker 地址填这里即可，无需改代码。
+      </div>
     </div>
   </div>
 </div>
@@ -413,6 +421,9 @@ const RECORDINGS_PATH = 'recordings';
 
 // ========== Webhook：回传客户补充信息到企微智能表格 ==========
 const WEBHOOK_URL = 'https://qyapi.weixin.qq.com/cgi-bin/wedoc/smartsheet/webhook?key=13q3vpbak4k1uyFxoToaopH15jRjtaPaQ3LH74X7z3KRp7nLRZlCUVGk1T8OJc6AWGfXV3uIfbqfMb3t1ExEov1MaCgqwFX2dQHTShxleZ2r';
+// 回传代理地址（Cloudflare Worker，用于绕过浏览器跨域）。为空时回退直连（会跨域失败）。
+// 部署 Worker 后把地址填进「⚙️上传设置→回传代理地址」，或由管理员直接填这里并重新部署，全员立即生效。
+const WEBHOOK_PROXY_URL = '';
 // 回传字段名映射：本表字段 key -> 目标智能表格「列名」。若列名不同，只改这里即可。
 const WEBHOOK_FIELDS = {
   gender:   '性别',
@@ -1607,6 +1618,12 @@ function getGHToken() {
 function setGHToken(token) {
   localStorage.setItem('outbound_gh_token', token || '');
 }
+function getProxyUrl() {
+  return (localStorage.getItem('outbound_proxy_url') || '').trim();
+}
+function setProxyUrl(u) {
+  localStorage.setItem('outbound_proxy_url', u || '');
+}
 
 // ========== User mapping (owner_id -> name) ==========
 // Loaded from user_map.json at runtime. Falls back to inline owner_name / raw id.
@@ -1681,6 +1698,13 @@ function init() {
   document.getElementById('ghToken').oninput = function() {
     setGHToken(this.value);
     updateGHStatus(!!this.value.trim());
+  };
+
+  // Restore 回传代理地址
+  const savedProxy = getProxyUrl() || WEBHOOK_PROXY_URL;
+  if (savedProxy) document.getElementById('proxyUrl').value = savedProxy;
+  document.getElementById('proxyUrl').oninput = function() {
+    setProxyUrl(this.value.trim());
   };
 }
 
@@ -1901,8 +1925,10 @@ async function syncLeadExtra() {
   const btn = document.getElementById('syncBtn');
   const st = document.getElementById('syncStatus');
   btn.disabled = true; st.style.color = ''; st.textContent = '⏳ 回传中...';
+  // 优先走代理（解决跨域），其次用常量里的地址，最后回退直连
+  const target = getProxyUrl() || WEBHOOK_PROXY_URL || WEBHOOK_URL;
   try {
-    const resp = await fetch(WEBHOOK_URL, {
+    const resp = await fetch(target, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -1920,7 +1946,8 @@ async function syncLeadExtra() {
     }
   } catch(e) {
     st.style.color = 'red';
-    st.textContent = '❌ 网络/跨域错误: ' + e.message + '（企业微信接口可能限制浏览器跨域，需代理时再找我）';
+    const viaProxy = !!(getProxyUrl() || WEBHOOK_PROXY_URL);
+    st.textContent = '❌ ' + (viaProxy ? ('代理请求失败: ' + e.message) : ('跨域错误: ' + e.message + '（请在「⚙️上传设置」填写回传代理地址）'));
   } finally {
     btn.disabled = false;
   }
