@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>康小虎 · 外呼工作台</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f5f6f8;
+    --card: #ffffff;
+    --primary: #1a7f5a;
+    --primary-light: #e8f5ef;
+    --danger: #e24b4b;
+    --warning: #d85a30;
+    --text: #1a1a1a;
+    --text-secondary: #666;
+    --text-muted: #999;
+    --border: #e8e8e8;
+    --shadow: 0 1px 3px rgba(0,0,0,0.06);
+    --radius: 10px;
+  }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+  .app { display: none; }
+  .app.active { display: flex; height: 100vh; }
+
+  /* Login */
+  .login-screen {
+    display: none;
+    align-items: center; justify-content: center;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #e8f5ef 0%, #d4ede3 100%);
+  }
+  .login-screen.active { display: flex; }
+  .login-card {
+    background: var(--card);
+    border-radius: 16px;
+    padding: 48px 40px;
+    width: 400px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    text-align: center;
+  }
+  .login-card h1 {
+    font-size: 22px; font-weight: 600;
+    color: var(--primary); margin-bottom: 8px;
+  }
+  .login-card .subtitle {
+    font-size: 13px; color: var(--text-muted); margin-bottom: 32px;
+  }
+  .login-card select {
+    width: 100%; padding: 12px 16px;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 15px; background: var(--bg);
+    cursor: pointer; appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' fill='none' stroke='%23999' stroke-width='1.5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 14px center;
+  }
+  .login-card button {
+    width: 100%; padding: 12px;
+    border: none; border-radius: var(--radius);
+    background: var(--primary); color: #fff;
+    font-size: 16px; font-weight: 500;
+    cursor: pointer; margin-top: 20px;
+    transition: opacity 0.15s;
+  }
+  .login-card button:hover { opacity: 0.9; }
+  .login-card button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* Settings toggle on login */
+  .settings-toggle {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 12px; color: var(--text-muted); cursor: pointer;
+    margin-top: 16px; user-select: none;
+  }
+  .settings-toggle:hover { color: var(--primary); }
+  .settings-panel {
+    display: none; text-align: left;
+    background: var(--bg); border-radius: var(--radius);
+    padding: 16px; margin-top: 12px;
+  }
+  .settings-panel.active { display: block; }
+  .settings-panel label {
+    display: block; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); margin-bottom: 6px;
+  }
+  .settings-panel input {
+    width: 100%; padding: 8px 12px;
+    border: 1px solid var(--border); border-radius: 6px;
+    font-size: 13px; font-family: "SF Mono", monospace;
+    background: var(--card);
+  }
+  .settings-panel .help-text {
+    font-size: 11px; color: var(--text-muted); margin-top: 6px;
+    line-height: 1.5;
+  }
+  .settings-panel .help-text a { color: var(--primary); }
+  .settings-panel .status-indicator {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; margin-top: 8px;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .dot.green { background: var(--primary); }
+  .dot.gray { background: #ccc; }
+
+  /* Banner */
+  .offline-banner {
+    background: #f0f7f4; color: var(--primary);
+    text-align: center; padding: 8px;
+    font-size: 12px; border-bottom: 1px solid #d4ede3;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    width: 360px; min-width: 360px;
+    background: var(--card);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+  }
+  .sidebar-header {
+    padding: 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .sidebar-header h2 {
+    font-size: 16px; font-weight: 600; color: var(--primary);
+  }
+  .sidebar-header .user-badge {
+    font-size: 12px; color: var(--text-muted);
+    background: var(--bg); padding: 4px 12px; border-radius: 20px;
+  }
+  .lead-list { flex: 1; overflow-y: auto; padding: 12px; }
+  .lead-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px;
+    margin-bottom: 10px; cursor: pointer; transition: all 0.15s;
+  }
+  .lead-card:hover { border-color: var(--primary); box-shadow: var(--shadow); }
+  .lead-card.active { border-color: var(--primary); background: var(--primary-light); }
+  .lead-card .row1 {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .lead-card .name { font-size: 15px; font-weight: 600; }
+  .lead-card .platform {
+    font-size: 11px; color: var(--primary);
+    background: var(--primary-light); padding: 2px 8px; border-radius: 4px;
+  }
+  .lead-card .row2 {
+    display: flex; gap: 16px; font-size: 12px; color: var(--text-secondary);
+  }
+  .lead-card .phone { font-family: "SF Mono", "Menlo", monospace; }
+
+  .search-bar {
+    padding: 12px 20px; border-bottom: 1px solid var(--border);
+  }
+  .search-bar input {
+    width: 100%; padding: 8px 12px;
+    border: 1px solid var(--border); border-radius: var(--radius);
+    font-size: 13px; background: var(--bg);
+  }
+
+  /* Main */
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .main-header {
+    padding: 16px 24px; border-bottom: 1px solid var(--border);
+    background: var(--card);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .main-header .tabs { display: flex; gap: 8px; }
+  .main-header .tab {
+    padding: 6px 16px; border-radius: 6px;
+    font-size: 13px; cursor: pointer; border: none;
+    background: transparent; color: var(--text-secondary);
+  }
+  .main-header .tab.active {
+    background: var(--primary-light); color: var(--primary); font-weight: 500;
+  }
+  .stats-bar {
+    display: flex; gap: 20px;
+    font-size: 12px; color: var(--text-muted);
+  }
+  .stats-bar b { color: var(--text); }
+
+  .main-content {
+    flex: 1; overflow-y: auto; padding: 24px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+  }
+
+  /* Call Panel */
+  .call-panel { text-align: center; max-width: 500px; width: 100%; }
+  .call-panel .empty-state {
+    color: var(--text-muted); padding: 60px 0;
+  }
+  .call-panel .empty-state .icon {
+    font-size: 48px; margin-bottom: 16px; opacity: 0.3;
+  }
+  .call-panel .lead-info {
+    background: var(--bg); border-radius: var(--radius);
+    padding: 16px 20px; margin-bottom: 24px; text-align: left;
+  }
+  .call-panel .lead-info .label {
+    font-size: 12px; color: var(--text-muted); margin-bottom: 4px;
+  }
+  .call-panel .lead-info .value { font-size: 15px; font-weight: 500; }
+  .call-panel .lead-info .phone-value {
+    font-size: 20px; font-family: "SF Mono", "Menlo", monospace;
+    color: var(--primary); font-weight: 600; letter-spacing: 1px;
+  }
+
+  .record-btn {
+    width: 120px; height: 120px; border-radius: 50%;
+    border: 4px solid var(--primary);
+    background: var(--card); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; font-weight: 600;
+    color: var(--primary); transition: all 0.2s;
+    margin: 0 auto 16px;
+  }
+  .record-btn:hover { background: var(--primary-light); }
+  .record-btn.recording {
+    background: var(--danger); border-color: var(--danger);
+    color: #fff; animation: pulse 1.5s infinite;
+  }
+  .record-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(226, 75, 75, 0.4); }
+    50% { box-shadow: 0 0 0 16px rgba(226, 75, 75, 0); }
+  }
+  .call-panel .timer {
+    font-size: 28px; font-weight: 600;
+    font-family: "SF Mono", "Menlo", monospace;
+    color: var(--text); margin-bottom: 8px;
+  }
+  .call-panel .hint {
+    font-size: 12px; color: var(--text-muted); margin-top: 16px;
+  }
+  .call-panel .hint.recording-hint { color: var(--danger); }
+
+  /* Upload progress bar */
+  .upload-bar {
+    width: 100%; max-width: 400px;
+    background: var(--border); border-radius: 4px;
+    height: 4px; margin: 12px auto; overflow: hidden;
+  }
+  .upload-bar .fill {
+    height: 100%; background: var(--primary);
+    width: 0%; transition: width 0.3s;
+  }
+  .upload-status {
+    font-size: 12px; color: var(--text-muted);
+    margin-bottom: 12px;
+  }
+  .upload-status.success { color: var(--primary); }
+  .upload-status.error { color: var(--danger); }
+  .upload-status.uploading { color: var(--warning); }
+
+  /* History */
+  .calls-table {
+    width: 100%; border-collapse: collapse; font-size: 13px;
+  }
+  .calls-table th {
+    text-align: left; padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-muted); font-weight: 500; font-size: 12px;
+  }
+  .calls-table td {
+    padding: 10px 12px; border-bottom: 1px solid var(--border);
+  }
+
+  .btn {
+    padding: 8px 16px; border-radius: 6px;
+    border: none; font-size: 13px; cursor: pointer; font-weight: 500;
+  }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-sm { padding: 4px 10px; font-size: 12px; }
+  .btn-ghost { background: transparent; color: var(--text-secondary); border: 1px solid var(--border); }
+  .btn-danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
+
+  .file-link {
+    color: var(--primary); font-size: 12px;
+    text-decoration: none; display: flex; align-items: center; gap: 4px;
+  }
+  .file-link:hover { text-decoration: underline; }
+
+  .toast {
+    position: fixed; top: 20px; right: 20px;
+    background: var(--text); color: #fff;
+    padding: 12px 20px; border-radius: var(--radius);
+    font-size: 13px; z-index: 1000;
+    opacity: 0; transform: translateY(-10px);
+    transition: all 0.3s;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.success { background: var(--primary); }
+  .toast.error { background: var(--danger); }
+  .toast.warning { background: var(--warning); }
+</style>
+</head>
+<body>
+
+<!-- Login Screen -->
+<div class="login-screen active" id="loginScreen">
+  <div class="login-card">
+    <h1>🌿 康小虎 · 外呼工作台</h1>
+    <p class="subtitle">线索电话跟进 · 录音自动上传 · AI智能分析</p>
+    <select id="userSelect">
+      <option value="">选择你的名字</option>
+    </select>
+    <button id="loginBtn" disabled>进入工作台</button>
+
+    <!-- GitHub Settings -->
+    <div class="settings-toggle" onclick="toggleSettings()">
+      ⚙️ 上传设置
+      <span id="settingsStatus"></span>
+    </div>
+    <div class="settings-panel" id="settingsPanel">
+      <label>GitHub Personal Access Token (Fine-grained)</label>
+      <input type="password" id="ghToken" placeholder="github_pat_...">
+      <div class="help-text">
+        需要具有 <code>contents:write</code> 权限的 token。<br>
+        <a href="https://github.com/settings/tokens?type=beta" target="_blank">点此创建 Fine-grained token →</a><br>
+        仓库选 <code>yiru220/outbound-workbench</code>，权限选 <b>Contents: Read and write</b>
+      </div>
+      <div class="status-indicator" id="ghStatus">
+        <span class="dot gray"></span> 未配置
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Main App -->
+<div class="app" id="app">
+  <div class="offline-banner">
+    🎙️ 录音自动上传至 GitHub 仓库 · 录音文件同步到 <b>outbound/recordings/</b> 目录
+  </div>
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h2>线索列表</h2>
+      <span class="user-badge" id="currentUser"></span>
+    </div>
+    <div class="search-bar">
+      <input type="text" id="searchInput" placeholder="搜索姓名/手机号/平台...">
+    </div>
+    <div class="lead-list" id="leadList"></div>
+  </aside>
+
+  <!-- Main Area -->
+  <main class="main">
+    <div class="main-header">
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab('call')">外呼</button>
+        <button class="tab" onclick="switchTab('history')">通话记录</button>
+      </div>
+      <div class="stats-bar">
+        <span>通话: <b id="callCount">0</b></span>
+        <span>线索: <b id="leadCount">0</b></span>
+        <span>已上传: <b id="uploadedCount">0</b></span>
+      </div>
+    </div>
+    <div class="main-content" id="mainContent"></div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ========== Config ==========
+const GITHUB_REPO = 'yiru220/outbound-workbench';
+const GITHUB_BRANCH = 'main';
+const RECORDINGS_PATH = 'recordings';
+
+// ========== Team ==========
+const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
+
+// ========== Sample Leads ==========
+const SAMPLE_LEADS = [
+  {"record_id":"r1","account_name":"北京盛世康源科技有限公司","phone":"138****6789","name":"张总","platform":"抖音","is_contacted":"已对接","is_cooperating":"跟进中","feedback":"对健康小屋项目感兴趣，需要进一步了解套餐详情","is_key":"是","gender":"男","age":"45"},
+  {"record_id":"r2","account_name":"深圳市颐养健康管理有限公司","phone":"139****8901","name":"李女士","platform":"小红书","is_contacted":"未对接","is_cooperating":"否","feedback":"","is_key":"否","gender":"女","age":"38"},
+  {"record_id":"r3","account_name":"杭州康瑞养老服务有限公司","phone":"137****2345","name":"王董事长","platform":"视频号","is_contacted":"已对接","is_cooperating":"是","feedback":"6月已签约体验伙伴套餐","is_key":"OPC客户","gender":"男","age":"52"},
+  {"record_id":"r4","account_name":"广州市颐年健康科技有限公司","phone":"136****4567","name":"陈总","platform":"抖音","is_contacted":"已对接","is_cooperating":"跟进中","feedback":"预算有限，需要更多案例参考","is_key":"否","gender":"男","age":"40"},
+  {"record_id":"r5","account_name":"成都天府健康产业有限公司","phone":"135****7890","name":"赵女士","platform":"公众号","is_contacted":"未对接","is_cooperating":"否","feedback":"","is_key":"否","gender":"女","age":"35"},
+  {"record_id":"r6","account_name":"武汉江城养生管理有限公司","phone":"134****0123","name":"周总","platform":"抖音","is_contacted":"已对接","is_cooperating":"否","feedback":"对价格有顾虑，需要比价","is_key":"否","gender":"男","age":"48"},
+  {"record_id":"r7","account_name":"南京金康健康科技有限公司","phone":"133****3456","name":"吴女士","platform":"小红书","is_contacted":"已对接","is_cooperating":"跟进中","feedback":"已参加上会，对15万套餐有兴趣","is_key":"是","gender":"女","age":"42"},
+  {"record_id":"r8","account_name":"重庆巴渝健康管理有限公司","phone":"132****6789","name":"郑总","platform":"视频号","is_contacted":"未对接","is_cooperating":"否","feedback":"","is_key":"否","gender":"男","age":"55"},
+  {"record_id":"r9","account_name":"西安秦汉养生文化有限公司","phone":"131****9012","name":"刘女士","platform":"抖音","is_contacted":"已对接","is_cooperating":"是","feedback":"已购买30万深度伙伴套餐","is_key":"OPC客户","gender":"女","age":"39"},
+  {"record_id":"r10","account_name":"长沙湘雅健康产业有限公司","phone":"130****1234","name":"黄总","platform":"公众号","is_contacted":"未对接","is_cooperating":"否","feedback":"","is_key":"否","gender":"男","age":"46"}
+];
+
+// ========== State ==========
+let currentUser = '';
+let selectedLead = null;
+let mediaRecorder = null;
+let audioChunks = [];
+let recordStartTime = null;
+let timerInterval = null;
+let currentTab = 'call';
+let leads = [];
+let calls = [];
+
+// GitHub token from localStorage
+function getGHToken() {
+  return (localStorage.getItem('outbound_gh_token') || '').trim();
+}
+function setGHToken(token) {
+  localStorage.setItem('outbound_gh_token', token || '');
+}
+
+// ========== Init ==========
+function init() {
+  // Load calls
+  try {
+    const saved = localStorage.getItem('outbound_calls');
+    calls = saved ? JSON.parse(saved) : [];
+  } catch(e) { calls = []; }
+
+  // Populate user dropdown
+  const select = document.getElementById('userSelect');
+  TEAM.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m; opt.textContent = m;
+    select.appendChild(opt);
+  });
+  select.onchange = () => {
+    document.getElementById('loginBtn').disabled = !select.value;
+  };
+  document.getElementById('loginBtn').onclick = login;
+  document.getElementById('searchInput').oninput = renderLeads;
+
+  // Restore GitHub token
+  const savedToken = getGHToken();
+  if (savedToken) {
+    document.getElementById('ghToken').value = savedToken;
+    updateGHStatus(true);
+  }
+  document.getElementById('ghToken').oninput = function() {
+    setGHToken(this.value);
+    updateGHStatus(!!this.value.trim());
+  };
+}
+
+function toggleSettings() {
+  document.getElementById('settingsPanel').classList.toggle('active');
+}
+
+function updateGHStatus(configured) {
+  const el = document.getElementById('ghStatus');
+  const dot = configured ? 'green' : 'gray';
+  const text = configured ? '已配置 (录音将自动上传)' : '未配置 (录音仅存本地)';
+  el.innerHTML = `<span class="dot ${dot}"></span> ${text}`;
+  document.getElementById('settingsStatus').textContent = configured ? ' ✓' : '';
+}
+
+function login() {
+  currentUser = document.getElementById('userSelect').value;
+  if (!currentUser) return;
+  document.getElementById('loginScreen').classList.remove('active');
+  document.getElementById('app').classList.add('active');
+  document.getElementById('currentUser').textContent = currentUser;
+  leads = [...SAMPLE_LEADS];
+  updateStats();
+  renderLeads();
+  renderMain();
+}
+
+// ========== Render ==========
+function updateStats() {
+  document.getElementById('callCount').textContent = calls.length;
+  document.getElementById('leadCount').textContent = leads.length;
+  const uploaded = calls.filter(c => c.uploaded).length;
+  document.getElementById('uploadedCount').textContent = uploaded;
+}
+
+function renderLeads() {
+  const search = (document.getElementById('searchInput').value || '').toLowerCase();
+  const filtered = leads.filter(l => {
+    if (!search) return true;
+    return (l.name + l.phone + l.account_name + l.platform + l.feedback).toLowerCase().includes(search);
+  });
+
+  const container = document.getElementById('leadList');
+  if (filtered.length === 0) {
+    container.innerHTML = '<div style="text-align:center;padding:40px 0;color:#999;font-size:13px;">没有匹配的线索</div>';
+    return;
+  }
+
+  container.innerHTML = filtered.map(l => {
+    const isActive = selectedLead && selectedLead.record_id === l.record_id;
+    return `
+      <div class="lead-card ${isActive ? 'active' : ''}" onclick="selectLead('${l.record_id}')">
+        <div class="row1">
+          <span class="name">${l.name || l.account_name || '未命名'}</span>
+          <span class="platform">${l.platform || ''}</span>
+        </div>
+        <div class="row2">
+          <span class="phone">${l.phone || '无号码'}</span>
+          <span>${l.is_contacted || '未对接'}</span>
+        </div>
+        ${l.feedback ? `<div style="font-size:11px;color:#999;margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${l.feedback}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+function selectLead(recordId) {
+  selectedLead = leads.find(l => l.record_id === recordId);
+  renderLeads();
+  renderMain();
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+  renderMain();
+}
+
+function renderMain() {
+  const container = document.getElementById('mainContent');
+
+  if (currentTab === 'call') {
+    if (!selectedLead) {
+      container.innerHTML = `
+        <div class="call-panel">
+          <div class="empty-state">
+            <div class="icon">📞</div>
+            <p style="font-size:15px;font-weight:500;">选择一个线索开始外呼</p>
+            <p style="font-size:13px;color:#999;">从左侧列表点击要拨打的客户</p>
+          </div>
+        </div>`;
+      return;
+    }
+
+    const l = selectedLead;
+    const hasGH = !!getGHToken();
+    container.innerHTML = `
+      <div class="call-panel">
+        <div class="lead-info">
+          <div class="label">客户名称</div>
+          <div class="value">${l.name || l.account_name || '未命名'}</div>
+          <div style="margin-top:12px;">
+            <div class="label">联系电话</div>
+            <div class="phone-value">${l.phone || '无号码'}</div>
+          </div>
+          <div style="display:flex;gap:20px;margin-top:12px;">
+            <div><div class="label">平台</div><div class="value" style="font-size:13px;">${l.platform || '-'}</div></div>
+            <div><div class="label">状态</div><div class="value" style="font-size:13px;">${l.is_contacted || '未对接'}</div></div>
+            <div><div class="label">合作</div><div class="value" style="font-size:13px;">${l.is_cooperating || '-'}</div></div>
+          </div>
+          ${l.feedback ? `<div style="margin-top:12px;"><div class="label">之前反馈</div><div style="font-size:13px;color:#666;">${l.feedback}</div></div>` : ''}
+        </div>
+        <div id="timerDisplay" class="timer" style="display:none;">00:00</div>
+        <button class="record-btn" id="recordBtn" onclick="toggleRecording()">开始录音</button>
+        <div id="uploadArea"></div>
+        <div class="hint" id="recordHint">点击后开始录音，用手机拨打客户，开启外放</div>
+        ${hasGH ? '' : '<div class="hint" style="color:var(--warning);margin-top:4px;">⚠️ 未配置GitHub Token，录音仅保存在本地。点登录页「⚙️ 上传设置」配置</div>'}
+      </div>`;
+  } else {
+    // History tab
+    const myCalls = calls.filter(c => c.user_name === currentUser);
+    if (myCalls.length === 0) {
+      container.innerHTML = '<div class="call-panel"><div class="empty-state"><div class="icon">📋</div><p style="font-size:15px;font-weight:500;">暂无通话记录</p><p style="font-size:13px;color:#999;">完成一次外呼后会出现在这里</p></div></div>';
+      return;
+    }
+    container.innerHTML = `<div style="width:100%;max-width:800px;">
+      <table class="calls-table">
+        <thead><tr><th>客户</th><th>电话</th><th>时间</th><th>时长</th><th>存储状态</th><th>操作</th></tr></thead>
+        <tbody>${myCalls.slice().reverse().map(c => renderCallRow(c)).join('')}</tbody>
+      </table>
+      <p style="margin-top:16px;font-size:12px;color:#999;text-align:center;">
+        录音自动上传至 <code>yiru220/outbound-workbench/${RECORDINGS_PATH}/</code> · AI分析待接入
+      </p>
+    </div>`;
+  }
+}
+
+function renderCallRow(c) {
+  let statusHtml = '';
+  let actionsHtml = '';
+
+  if (c.uploaded && c.github_url) {
+    statusHtml = `<a class="file-link" href="${c.github_url}" target="_blank">📁 已上传</a>`;
+    actionsHtml = `<button class="btn btn-sm btn-ghost" onclick="copyLink('${c.github_url}')">复制链接</button>`;
+  } else if (c.upload_error) {
+    statusHtml = `<span style="color:var(--danger);font-size:12px;" title="${c.upload_error}">❌ 上传失败</span>`;
+    actionsHtml = `<button class="btn btn-sm btn-primary" onclick="retryUpload('${c.call_id}')">重试</button>`;
+  } else {
+    statusHtml = `<span style="color:var(--text-muted);font-size:12px;">📦 仅本地</span>`;
+    actionsHtml = getGHToken()
+      ? `<button class="btn btn-sm btn-primary" onclick="retryUpload('${c.call_id}')">上传</button>`
+      : `<button class="btn btn-sm btn-ghost" onclick="downloadAudio('${c.call_id}')">下载</button>`;
+  }
+
+  return `
+    <tr>
+      <td>${c.lead_name || '-'}</td>
+      <td style="font-family:monospace;">${c.lead_phone || '-'}</td>
+      <td style="font-size:12px;">${c.started_at || '-'}</td>
+      <td>${c.duration || '-'}</td>
+      <td>${statusHtml}</td>
+      <td style="display:flex;gap:6px;">
+        ${actionsHtml}
+        <button class="btn btn-sm btn-danger" onclick="deleteCall('${c.call_id}')">删除</button>
+      </td>
+    </tr>
+  `;
+}
+
+// ========== Recording ==========
+async function toggleRecording() {
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    stopRecording();
+    return;
+  }
+  await startRecording();
+}
+
+async function startRecording() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    let mimeType = 'audio/webm;codecs=opus';
+    if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'audio/webm';
+    if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'audio/mp4';
+
+    mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
+    audioChunks = [];
+
+    mediaRecorder.ondataavailable = e => {
+      if (e.data.size > 0) audioChunks.push(e.data);
+    };
+    mediaRecorder.onstop = () => {
+      saveAndUpload();
+      stream.getTracks().forEach(t => t.stop());
+    };
+    mediaRecorder.onerror = (e) => {
+      console.error('Recorder error:', e);
+      toast('录音出错', 'error');
+    };
+
+    mediaRecorder.start(1000);
+    recordStartTime = Date.now();
+
+    const btn = document.getElementById('recordBtn');
+    btn.textContent = '停止录音';
+    btn.classList.add('recording');
+
+    document.getElementById('timerDisplay').style.display = 'block';
+    document.getElementById('recordHint').textContent = '录音中... 用手机拨打客户，开启外放';
+    document.getElementById('recordHint').classList.add('recording-hint');
+
+    timerInterval = setInterval(updateTimer, 1000);
+    toast('录音已开始 — 请用手机拨打客户并开外放');
+  } catch (e) {
+    console.error(e);
+    toast('无法访问麦克风，请检查浏览器权限', 'error');
+  }
+}
+
+function stopRecording() {
+  if (!mediaRecorder || mediaRecorder.state !== 'recording') return;
+  mediaRecorder.stop();
+  clearInterval(timerInterval);
+
+  const btn = document.getElementById('recordBtn');
+  btn.textContent = '保存中...';
+  btn.classList.remove('recording');
+  btn.disabled = true;
+
+  document.getElementById('recordHint').textContent = '录音已停止，正在保存...';
+  document.getElementById('recordHint').classList.remove('recording-hint');
+}
+
+function updateTimer() {
+  const elapsed = Math.floor((Date.now() - recordStartTime) / 1000);
+  const m = Math.floor(elapsed / 60).toString().padStart(2, '0');
+  const s = (elapsed % 60).toString().padStart(2, '0');
+  document.getElementById('timerDisplay').textContent = `${m}:${s}`;
+}
+
+function saveAndUpload() {
+  const mimeType = mediaRecorder.mimeType || 'audio/webm';
+  const ext = mimeType.includes('mp4') ? 'm4a' : 'webm';
+  const audioBlob = new Blob(audioChunks, { type: mimeType });
+  const callId = 'call_' + Date.now();
+  const duration = Math.floor((Date.now() - recordStartTime) / 1000);
+  const startedAt = new Date(recordStartTime).toLocaleString('zh-CN');
+
+  // Show upload area
+  const uploadArea = document.getElementById('uploadArea');
+  if (uploadArea) {
+    uploadArea.innerHTML = `
+      <div class="upload-bar"><div class="fill" id="uploadFill"></div></div>
+      <div class="upload-status uploading" id="uploadStatus">⏳ 正在上传到 GitHub...</div>`;
+  }
+
+  const reader = new FileReader();
+  reader.onload = async function() {
+    const call = {
+      call_id: callId,
+      lead_name: selectedLead ? (selectedLead.name || selectedLead.account_name) : '未知',
+      lead_phone: selectedLead ? selectedLead.phone : '',
+      user_name: currentUser,
+      started_at: startedAt,
+      duration: formatDuration(duration),
+      duration_sec: duration,
+      audio_data: reader.result,
+      audio_type: mimeType,
+      audio_size: audioBlob.size,
+      created: Date.now(),
+      uploaded: false,
+      github_url: null,
+      upload_error: null,
+    };
+    calls.push(call);
+
+    // Keep only last 200 calls
+    if (calls.length > 200) calls = calls.slice(-200);
+
+    try {
+      localStorage.setItem('outbound_calls', JSON.stringify(calls));
+    } catch(e) {
+      // Remove oldest calls to make room
+      calls = calls.slice(-100);
+      try { localStorage.setItem('outbound_calls', JSON.stringify(calls)); } catch(e2) {
+        toast('存储空间不足，请清理旧录音', 'error');
+      }
+    }
+
+    updateStats();
+
+    // Try GitHub upload
+    const token = getGHToken();
+    if (token) {
+      try {
+        await uploadToGitHub(call, reader.result);
+      } catch(e) {
+        console.error('GitHub upload failed:', e);
+        call.upload_error = e.message;
+        updateCallInStorage(call);
+        updateUploadUI('error', e.message);
+        toast('上传失败: ' + e.message, 'error');
+      }
+    } else {
+      updateUploadUI('local', 'GitHub Token 未配置，录音仅保存在本地');
+      toast(`录音已保存 (${formatDuration(duration)}) · 未配置上传`, 'warning');
+    }
+
+    // Reset UI
+    const btn = document.getElementById('recordBtn');
+    btn.textContent = '开始录音';
+    btn.disabled = false;
+    document.getElementById('timerDisplay').style.display = 'none';
+    document.getElementById('recordHint').textContent = '点击后开始录音，用手机拨打客户，开启外放';
+  };
+  reader.readAsDataURL(audioBlob);
+}
+
+function updateUploadUI(status, msg) {
+  const fill = document.getElementById('uploadFill');
+  const statusEl = document.getElementById('uploadStatus');
+  if (!fill || !statusEl) return;
+
+  if (status === 'uploading') {
+    fill.style.width = '50%';
+    statusEl.className = 'upload-status uploading';
+    statusEl.textContent = '⏳ 正在上传到 GitHub...';
+  } else if (status === 'success') {
+    fill.style.width = '100%';
+    statusEl.className = 'upload-status success';
+    statusEl.textContent = '✅ ' + msg;
+  } else if (status === 'error') {
+    fill.style.width = '100%';
+    fill.style.background = 'var(--danger)';
+    statusEl.className = 'upload-status error';
+    statusEl.textContent = '❌ ' + msg;
+  } else {
+    fill.style.width = '0%';
+    statusEl.className = 'upload-status uploading';
+    statusEl.textContent = '📦 ' + msg;
+  }
+}
+
+// ========== GitHub API Upload ==========
+async function uploadToGitHub(call, dataUrl) {
+  const token = getGHToken();
+  if (!token) throw new Error('未配置 GitHub Token');
+
+  // Build file path: outbound/recordings/YYYY-MM/username/客户名_上传人_YYYYMMDD_HHMMSS.webm
+  const now = new Date();
+  const month = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const recStart = new Date(recordStartTime);
+  const pad = (n) => String(n).padStart(2, '0');
+  const ymdhms = `${recStart.getFullYear()}${pad(recStart.getMonth()+1)}${pad(recStart.getDate())}_${pad(recStart.getHours())}${pad(recStart.getMinutes())}${pad(recStart.getSeconds())}`;
+  const safeName = (call.lead_name || '未知客户').replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_').substring(0, 20);
+  const safeUser = (call.user_name || '未知').replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_').substring(0, 15);
+  const fileName = `${safeName}_${safeUser}_${ymdhms}.webm`;
+  const filePath = `${RECORDINGS_PATH}/${month}/${call.user_name}/${fileName}`;
+
+  // Extract base64 content (strip data URL prefix)
+  const base64Content = dataUrl.split(',')[1];
+
+  updateUploadUI('uploading');
+
+  // GitHub Contents API: PUT /repos/{owner}/{repo}/contents/{path}
+  const apiUrl = `https://api.github.com/repos/${GITHUB_REPO}/contents/${filePath}`;
+  const body = JSON.stringify({
+    message: `📞 外呼录音: ${call.lead_name} | ${call.user_name} | ${call.started_at}`,
+    content: base64Content,
+    branch: GITHUB_BRANCH,
+  });
+
+  const resp = await fetch(apiUrl, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      'Accept': 'application/vnd.github.v3+json',
+    },
+    body: body,
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    if (resp.status === 401) throw new Error('Token 无效或已过期，请重新配置');
+    if (resp.status === 403) throw new Error('Token 权限不足，需要 contents:write 权限');
+    if (resp.status === 409) throw new Error('文件已存在: ' + filePath);
+    throw new Error(err.message || `上传失败 (HTTP ${resp.status})`);
+  }
+
+  const result = await resp.json();
+  const githubUrl = result.content.html_url || result.content.url;
+
+  // Update call record
+  call.uploaded = true;
+  call.github_url = githubUrl;
+  call.github_path = filePath;
+  call.upload_error = null;
+  updateCallInStorage(call);
+
+  updateStats();
+  updateUploadUI('success', `已上传 → ${filePath}`);
+  toast(`✅ 录音已自动上传到 GitHub`, 'success');
+
+  // Update history tab if visible
+  if (currentTab === 'history') renderMain();
+}
+
+function updateCallInStorage(call) {
+  const idx = calls.findIndex(c => c.call_id === call.call_id);
+  if (idx >= 0) calls[idx] = call;
+  try { localStorage.setItem('outbound_calls', JSON.stringify(calls)); } catch(e) {}
+}
+
+async function retryUpload(callId) {
+  const call = calls.find(c => c.call_id === callId);
+  if (!call || !call.audio_data) {
+    toast('录音数据不存在', 'error');
+    return;
+  }
+  if (call.uploaded) {
+    toast('已上传，无需重试');
+    return;
+  }
+
+  toast('正在重新上传...', 'warning');
+  try {
+    await uploadToGitHub(call, call.audio_data);
+  } catch(e) {
+    call.upload_error = e.message;
+    updateCallInStorage(call);
+    toast('上传失败: ' + e.message, 'error');
+  }
+  renderMain();
+}
+
+function copyLink(url) {
+  navigator.clipboard.writeText(url).then(() => {
+    toast('链接已复制');
+  }).catch(() => {
+    toast('复制失败，请手动复制', 'error');
+  });
+}
+
+function downloadAudio(callId) {
+  const call = calls.find(c => c.call_id === callId);
+  if (!call || !call.audio_data) {
+    toast('录音数据不存在', 'error');
+    return;
+  }
+  const a = document.createElement('a');
+  a.href = call.audio_data;
+  const d = new Date(call.created || Date.now());
+  const p = (n) => String(n).padStart(2, '0');
+  const ts = `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+  const su = (call.user_name || '未知').replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_');
+  const sn = (call.lead_name || '未知客户').replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_');
+  a.download = `${sn}_${su}_${ts}.webm`;
+  a.click();
+}
+
+function deleteCall(callId) {
+  if (!confirm('确定删除这条通话记录？录音文件无法从 GitHub 自动删除')) return;
+  calls = calls.filter(c => c.call_id !== callId);
+  localStorage.setItem('outbound_calls', JSON.stringify(calls));
+  updateStats();
+  renderMain();
+  toast('已删除');
+}
+
+function formatDuration(sec) {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return m > 0 ? `${m}分${s}秒` : `${s}秒`;
+}
+
+// ========== Toast ==========
+function toast(msg, type = 'success') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast ' + type + ' show';
+  clearTimeout(el._timeout);
+  el._timeout = setTimeout(() => { el.className = 'toast'; }, 4000);
+}
+
+// Start
+init();
+</script>
+</body>
+</html>
