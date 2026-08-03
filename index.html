@@ -166,6 +166,12 @@
     border: 1px solid var(--border); border-radius: var(--radius);
     font-size: 13px; background: var(--bg);
   }
+  .mine-filter {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; color: #555; padding: 8px 12px 2px; cursor: pointer;
+    user-select: none;
+  }
+  .mine-filter input { cursor: pointer; width: 14px; height: 14px; }
 
   /* Main */
   .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
@@ -352,6 +358,9 @@
     <div class="search-bar">
       <input type="text" id="searchInput" placeholder="搜索姓名/手机号/平台...">
     </div>
+    <label class="mine-filter" title="只看分配给我（当前登录人）的线索">
+      <input type="checkbox" id="mineOnly" onchange="renderLeads()"> 只看我负责的
+    </label>
     <div class="lead-list" id="leadList"></div>
   </aside>
 
@@ -1552,6 +1561,7 @@ let timerInterval = null;
 let currentTab = 'call';
 let leads = [];
 let calls = [];
+let USER_MAP = {};
 
 // GitHub token from localStorage
 function getGHToken() {
@@ -1561,6 +1571,38 @@ function setGHToken(token) {
   localStorage.setItem('outbound_gh_token', token || '');
 }
 
+// ========== User mapping (owner_id -> name) ==========
+// Loaded from user_map.json at runtime. Falls back to inline owner_name / raw id.
+function ownerNameOf(id) {
+  const m = (USER_MAP[id] || '').trim();
+  return m;
+}
+function ownerIdForName(name) {
+  if (!name) return null;
+  for (const k in USER_MAP) {
+    if (USER_MAP[k] && USER_MAP[k] === name) return k;
+  }
+  return null;
+}
+// Compact chip for the lead list card
+function ownerChip(l) {
+  const id = l.owner_id || '';
+  const name = ownerNameOf(id) || l.owner_name || '';
+  if (!name && !id) return '';
+  const color = name ? '#2b6cb0' : '#aaa';
+  const label = name || id;
+  return `<div style="font-size:11px;color:${color};margin-top:4px;">对接人: ${label}</div>`;
+}
+// Detail block for the call panel
+function ownerChipDetail(l) {
+  const id = l.owner_id || '';
+  const name = ownerNameOf(id) || l.owner_name || '';
+  if (!name && !id) return '';
+  const color = name ? '#2b6cb0' : '#aaa';
+  const label = name || id;
+  return `<div style="margin-top:12px;"><div class="label">负责人</div><div class="value" style="font-size:13px;color:${color};">${label}</div></div>`;
+}
+
 // ========== Init ==========
 function init() {
   // Load calls
@@ -1568,6 +1610,13 @@ function init() {
     const saved = localStorage.getItem('outbound_calls');
     calls = saved ? JSON.parse(saved) : [];
   } catch(e) { calls = []; }
+
+  // Load user mapping (owner_id -> name) from user_map.json
+  try {
+    fetch('./user_map.json').then(r => r.ok ? r.json() : null).then(m => {
+      if (m && typeof m === 'object') USER_MAP = m;
+    }).catch(() => {});
+  } catch(e) {}
 
   // Populate user dropdown
   const select = document.getElementById('userSelect');
@@ -1628,12 +1677,23 @@ function updateStats() {
 
 function renderLeads() {
   const search = (document.getElementById('searchInput').value || '').toLowerCase();
+  const mineCb = document.getElementById('mineOnly');
+  const mineOnly = mineCb && mineCb.checked;
+  const myId = ownerIdForName(currentUser);
   const filtered = leads.filter(l => {
+    if (mineOnly) {
+      if (!myId) return false;
+      if (l.owner_id !== myId) return false;
+    }
     if (!search) return true;
     return (l.name + l.phone + l.account_name + l.platform + l.feedback).toLowerCase().includes(search);
   });
 
   const container = document.getElementById('leadList');
+  if (mineOnly && !myId) {
+    container.innerHTML = '<div style="text-align:center;padding:40px 0;color:#999;font-size:13px;line-height:1.6;">当前登录人「' + (currentUser || '未登录') + '」未在映射表中，<br>无法筛选「我负责的」。<br>请在 user_map.json 中补充姓名映射。</div>';
+    return;
+  }
   if (filtered.length === 0) {
     container.innerHTML = '<div style="text-align:center;padding:40px 0;color:#999;font-size:13px;">没有匹配的线索</div>';
     return;
@@ -1652,7 +1712,7 @@ function renderLeads() {
           <span>${l.is_contacted || '未对接'}</span>
         </div>
         ${l.feedback ? `<div style="font-size:11px;color:#999;margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${l.feedback}</div>` : ''}
-        ${l.owner_name ? `<div style="font-size:11px;color:#2b6cb0;margin-top:4px;">对接人: ${l.owner_name}</div>` : ''}
+        ${ownerChip(l)}
       </div>
     `;
   }).join('');
@@ -1703,7 +1763,7 @@ function renderMain() {
             <div><div class="label">状态</div><div class="value" style="font-size:13px;">${l.is_contacted || '未对接'}</div></div>
             <div><div class="label">合作</div><div class="value" style="font-size:13px;">${l.is_cooperating || '-'}</div></div>
           </div>
-          ${l.owner_name ? `<div style="margin-top:12px;"><div class="label">负责人</div><div class="value" style="font-size:13px;color:#2b6cb0;">${l.owner_name}</div></div>` : ''}
+          ${ownerChipDetail(l)}
           ${l.feedback ? `<div style="margin-top:12px;"><div class="label">之前反馈</div><div style="font-size:13px;color:#666;">${l.feedback}</div></div>` : ''}
         </div>
         <div id="timerDisplay" class="timer" style="display:none;">00:00</div>
