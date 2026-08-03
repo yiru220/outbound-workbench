@@ -250,6 +250,31 @@
     font-size: 12px; color: var(--text-muted); margin-top: 16px;
   }
   .call-panel .hint.recording-hint { color: var(--danger); }
+  .call-panel .extra-info {
+    margin: 18px 0 4px; padding: 14px; border: 1px solid var(--border);
+    border-radius: var(--radius); background: var(--bg); text-align: left;
+  }
+  .call-panel .extra-title {
+    font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 10px;
+  }
+  .call-panel .extra-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  }
+  .call-panel .extra-field label {
+    display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px;
+  }
+  .call-panel .extra-field select,
+  .call-panel .extra-field input {
+    width: 100%; padding: 7px 10px; font-size: 13px;
+    border: 1px solid var(--border); border-radius: 8px; background: #fff;
+    box-sizing: border-box;
+  }
+  .call-panel .sync-btn {
+    width: 100%; margin-top: 12px; padding: 10px; font-size: 14px; font-weight: 600;
+    color: #fff; background: #2b6cb0; border: none; border-radius: 10px; cursor: pointer;
+  }
+  .call-panel .sync-btn:disabled { opacity: .6; cursor: default; }
+  .call-panel .sync-status { margin-top: 8px; font-size: 12px; min-height: 16px; }
 
   /* Upload progress bar */
   .upload-bar {
@@ -385,6 +410,18 @@
 const GITHUB_REPO = 'yiru220/outbound-workbench';
 const GITHUB_BRANCH = 'main';
 const RECORDINGS_PATH = 'recordings';
+
+// ========== Webhook：回传客户补充信息到企微智能表格 ==========
+const WEBHOOK_URL = 'https://qyapi.weixin.qq.com/cgi-bin/wedoc/smartsheet/webhook?key=13q3vpbak4k1uyFxoToaopH15jRjtaPaQ3LH74X7z3KRp7nLRZlCUVGk1T8OJc6AWGfXV3uIfbqfMb3t1ExEov1MaCgqwFX2dQHTShxleZ2r';
+// 回传字段名映射：本表字段 key -> 目标智能表格「列名」。若列名不同，只改这里即可。
+const WEBHOOK_FIELDS = {
+  gender:   '性别',
+  province: '省',
+  city:     '市',
+  hasStore: '是否自有门店',
+  phone:    '手机号',
+  time:     '回传时间'
+};
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -1559,6 +1596,9 @@ let currentTab = 'call';
 let leads = [];
 let calls = [];
 let USER_MAP = {};
+// 客户补充信息（性别/省/市/是否自有门店），按 record_id 存储于 localStorage
+let leadExtras = {};
+try { leadExtras = JSON.parse(localStorage.getItem('outbound_extras') || '{}'); } catch(e) { leadExtras = {}; }
 
 // GitHub token from localStorage
 function getGHToken() {
@@ -1766,6 +1806,33 @@ function renderMain() {
           </div>
           ${ownerChipDetail(l)}
           ${l.feedback ? `<div style="margin-top:12px;"><div class="label">之前反馈</div><div style="font-size:13px;color:#666;">${l.feedback}</div></div>` : ''}
+          <div class="extra-info">
+            <div class="extra-title">📇 客户补充信息（填完点回传 → 智能表格）</div>
+            <div class="extra-grid">
+              <div class="extra-field">
+                <label>性别</label>
+                <select id="exGender" onchange="saveExtra('gender',this.value)">
+                  <option value="">未填</option><option>男</option><option>女</option><option>未知</option>
+                </select>
+              </div>
+              <div class="extra-field">
+                <label>省</label>
+                <input id="exProvince" type="text" placeholder="如 广东" onchange="saveExtra('province',this.value)">
+              </div>
+              <div class="extra-field">
+                <label>市</label>
+                <input id="exCity" type="text" placeholder="如 深圳" onchange="saveExtra('city',this.value)">
+              </div>
+              <div class="extra-field">
+                <label>是否自有门店</label>
+                <select id="exStore" onchange="saveExtra('hasStore',this.value)">
+                  <option value="">未填</option><option>是</option><option>否</option>
+                </select>
+              </div>
+            </div>
+            <button class="sync-btn" id="syncBtn" onclick="syncLeadExtra()">🚀 回传客户信息</button>
+            <div class="sync-status" id="syncStatus"></div>
+          </div>
         </div>
         <div id="timerDisplay" class="timer" style="display:none;">00:00</div>
         <button class="record-btn" id="recordBtn" onclick="toggleRecording()">开始录音</button>
@@ -1773,6 +1840,7 @@ function renderMain() {
         <div class="hint" id="recordHint">点击后开始录音，用手机拨打客户，开启外放</div>
         ${hasGH ? '' : '<div class="hint" style="color:var(--warning);margin-top:4px;">⚠️ 未配置GitHub Token，录音仅保存在本地。点登录页「⚙️ 上传设置」配置</div>'}
       </div>`;
+      initExtraFields(l);
   } else {
     // History tab
     const myCalls = calls.filter(c => c.user_name === currentUser);
@@ -1789,6 +1857,72 @@ function renderMain() {
         录音自动上传至 <code>yiru220/outbound-workbench/${RECORDINGS_PATH}/</code> · AI分析待接入
       </p>
     </div>`;
+  }
+}
+
+// ========== Lead extra info (性别/省/市/是否自有门店) ==========
+function saveExtra(key, val) {
+  if (!selectedLead) return;
+  const id = selectedLead.record_id;
+  if (!id) return;
+  leadExtras[id] = leadExtras[id] || {};
+  leadExtras[id][key] = val;
+  try { localStorage.setItem('outbound_extras', JSON.stringify(leadExtras)); } catch(e) {}
+}
+function initExtraFields(l) {
+  if (!l) return;
+  const ex = leadExtras[l.record_id] || {};
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+  set('exGender', ex.gender);
+  set('exProvince', ex.province);
+  set('exCity', ex.city);
+  set('exStore', ex.hasStore);
+}
+function fmtDate(d) {
+  const p = n => (n < 10 ? '0' + n : '' + n);
+  return d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+}
+async function syncLeadExtra() {
+  if (!selectedLead) return;
+  const l = selectedLead;
+  const phone = (l.phone || '').trim();
+  if (!phone) { toast('该线索没有手机号，无法回传'); return; }
+  const ex = leadExtras[l.record_id] || {};
+  const timeStr = fmtDate(new Date());
+  const F = WEBHOOK_FIELDS;
+  const values = {};
+  values[F.gender]   = ex.gender || '';
+  values[F.province] = ex.province || '';
+  values[F.city]     = ex.city || '';
+  values[F.hasStore] = ex.hasStore || '';
+  values[F.phone]    = phone;
+  values[F.time]     = timeStr;
+  const payload = { add_records: [ { values: values } ] };
+  const btn = document.getElementById('syncBtn');
+  const st = document.getElementById('syncStatus');
+  btn.disabled = true; st.style.color = ''; st.textContent = '⏳ 回传中...';
+  try {
+    const resp = await fetch(WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const txt = await resp.text();
+    let ok = false, msg = '';
+    try { const j = JSON.parse(txt); ok = (j.errcode === 0); msg = j.errmsg || ''; } catch(e) { ok = resp.ok; }
+    if (ok) {
+      st.style.color = 'green';
+      st.textContent = '✅ 回传成功 · ' + timeStr;
+      toast('客户信息已回传智能表格');
+    } else {
+      st.style.color = 'red';
+      st.textContent = '❌ 回传失败: ' + (msg || ('HTTP ' + resp.status));
+    }
+  } catch(e) {
+    st.style.color = 'red';
+    st.textContent = '❌ 网络/跨域错误: ' + e.message + '（企业微信接口可能限制浏览器跨域，需代理时再找我）';
+  } finally {
+    btn.disabled = false;
   }
 }
 
