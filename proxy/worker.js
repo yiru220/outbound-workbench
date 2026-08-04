@@ -21,7 +21,7 @@ const GITHUB_BRANCH = 'main';
 
 // Worker 代码版本。改动代码时同步 +1，方便判断 Cloudflare 是否已部署最新版。
 // 自检：浏览器直接打开 https://outbound-webhook-proxy.yiru220.workers.dev/health
-const WORKER_VERSION = '2026-08-04l-siliconflow';
+const WORKER_VERSION = '2026-08-04m-fixsha';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -101,7 +101,9 @@ async function handleGitHub(request, env) {
   } catch {
     return json({ error: 'Invalid JSON' }, 400);
   }
-  const { path, content, message, branch, sha } = payload;
+  const { path, content, message, branch } = payload;
+  // sha 需要在下方自动解析时重新赋值，必须用 let（用 const 会导致 esbuild 构建失败）
+  let sha = payload.sha;
   if (!path || !content) {
     return json({ error: 'path 和 content 为必填项' }, 400);
   }
