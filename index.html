@@ -436,12 +436,12 @@ const WEBHOOK_FIELDS = {
   province: 'fu0uQ1',   // 省 (单选)
   city:     'fz0DpX',   // 市 (文本)
   hasStore: 'fVBgw9',   // 是否自有门店 (单选)
-  phone:    'fuvsCp',   // 手机号 (数字)
+  phone:    'fuvsCp',   // 手机号 (文本)
   date:     'fEDPIZ'    // 回传日期 (日期时间)
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-04c';
+const APP_VERSION = '2026-08-04d';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -1925,15 +1925,15 @@ async function syncLeadExtra() {
   const ex = leadExtras[l.record_id] || {};
   const timeStr = fmtDate(new Date());
   const F = WEBHOOK_FIELDS;
-  // 企微智能表格写入格式：单选=[{text:值}]，文本=[{type:"text",text:值}]，数字=纯数字
-  // 空值字段不发送，避免单选/文本校验失败
+  // 企微智能表格写入格式：单选=[{text:值}]，文本=[{type:"text",text:值}]
+  // 手机号/市均为文本字段，必须按文本格式发送；空值字段不发送，避免校验失败
   const values = {};
   if (ex.gender)   values[F.gender]   = [{ text: ex.gender }];
   if (ex.province) values[F.province] = [{ text: ex.province }];
   if (ex.city)     values[F.city]     = [{ type: 'text', text: ex.city }];
   if (ex.hasStore) values[F.hasStore] = [{ text: ex.hasStore }];
-  const phoneNum = Number(String(phone).replace(/\D/g, ''));
-  if (phoneNum)   values[F.phone]     = phoneNum;
+  const phoneDigits = String(phone).replace(/\D/g, '');
+  if (phoneDigits) values[F.phone] = [{ type: 'text', text: phoneDigits }];
   values[F.date] = timeStr;  // 回传日期：年月日格式，写入当天日期
   const payload = { add_records: [ { values: values } ] };
   const btn = document.getElementById('syncBtn');
