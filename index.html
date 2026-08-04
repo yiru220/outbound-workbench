@@ -431,7 +431,8 @@ const WEBHOOK_FIELDS = {
   province: 'fu0uQ1',   // 省 (单选)
   city:     'fz0DpX',   // 市 (文本)
   hasStore: 'fVBgw9',   // 是否自有门店 (单选)
-  phone:    'fuvsCp'    // 手机号 (数字)
+  phone:    'fuvsCp',   // 手机号 (数字)
+  date:     'fEDPIZ'    // 回传日期 (日期时间)
 };
 
 // ========== Team ==========
@@ -1924,6 +1925,7 @@ async function syncLeadExtra() {
   if (ex.hasStore) values[F.hasStore] = [{ text: ex.hasStore }];
   const phoneNum = Number(String(phone).replace(/\D/g, ''));
   if (phoneNum)   values[F.phone]     = phoneNum;
+  values[F.date] = timeStr;  // 回传日期：年月日格式，写入当天日期
   const payload = { add_records: [ { values: values } ] };
   const btn = document.getElementById('syncBtn');
   const st = document.getElementById('syncStatus');
