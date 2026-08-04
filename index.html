@@ -185,6 +185,134 @@
     color: var(--primary); font-weight: 600; letter-spacing: 1px;
   }
 
+  /* ===== 两栏作业布局：左作业 / 右话术 ===== */
+  .call-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 400px;
+    gap: 20px; align-items: start;
+    max-width: 1140px; margin: 0 auto; text-align: left;
+  }
+  .work-col { min-width: 0; text-align: center; }
+  .work-col .call-panel { max-width: none; }
+  .script-col { min-width: 0; position: sticky; top: 0; }
+  @media (max-width: 1180px) {
+    .call-layout { grid-template-columns: minmax(0, 1fr); max-width: 640px; }
+    .script-col { position: static; }
+  }
+
+  /* ===== 话术面板 ===== */
+  .script-panel {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: var(--shadow);
+    overflow: hidden; text-align: left;
+  }
+  .script-head {
+    padding: 12px 16px 13px;
+    background: linear-gradient(135deg, #1a7f5a 0%, #26a173 100%); color: #fff;
+  }
+  .script-head .t {
+    font-size: 14px; font-weight: 600;
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  }
+  .script-head .t span.time {
+    font-size: 11px; font-weight: 400; background: rgba(255,255,255,.2);
+    padding: 2px 8px; border-radius: 10px; flex: 0 0 auto;
+  }
+  .script-head .sub { font-size: 11px; opacity: .85; margin-top: 3px; }
+  .script-bar {
+    height: 4px; background: rgba(255,255,255,.25);
+    border-radius: 2px; margin-top: 9px; overflow: hidden;
+  }
+  .script-bar i { display: block; height: 100%; background: #fff; width: 0; transition: width .25s ease; }
+  .script-rule {
+    margin: 12px 12px 10px; padding: 10px 12px;
+    background: #fff8ef; border: 1px solid #f7ddbc; border-left: 3px solid var(--warning);
+    border-radius: 8px; font-size: 12px; line-height: 1.75; color: #7c4a1c;
+  }
+  .script-rule b { color: var(--warning); }
+  .script-rule em {
+    font-style: normal; background: #fff; border: 1px solid #f0d4ae;
+    padding: 1px 5px; border-radius: 4px; color: #6b3f16;
+  }
+  .script-body { padding: 0 12px; max-height: calc(100vh - 300px); overflow-y: auto; }
+  .step-card {
+    border: 1px solid var(--border); border-radius: 9px;
+    margin-bottom: 10px; overflow: hidden; background: #fff;
+    transition: border-color .2s, background .2s;
+  }
+  .step-card.core { border-color: #f0c877; }
+  .step-card.done { border-color: var(--primary); background: #f8fdfb; }
+  .step-top {
+    display: flex; align-items: center; gap: 9px;
+    padding: 9px 11px; cursor: pointer; user-select: none; background: #fafbfc;
+  }
+  .step-card.core .step-top { background: #fffaf0; }
+  .step-card.done .step-top { background: var(--primary-light); }
+  .step-chk {
+    width: 18px; height: 18px; border-radius: 50%; flex: 0 0 auto;
+    border: 1.5px solid #ccc; background: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; color: transparent; line-height: 1;
+  }
+  .step-card.done .step-chk { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .step-name { font-size: 13px; font-weight: 600; flex: 1; min-width: 0; }
+  .step-card.done .step-name { color: var(--primary); }
+  .step-tag {
+    font-size: 10px; font-weight: 600; color: #a06a10;
+    background: #fdf0d5; border: 1px solid #f0c877;
+    padding: 1px 6px; border-radius: 9px; flex: 0 0 auto;
+  }
+  .step-sec {
+    font-size: 11px; color: var(--text-muted); background: #fff;
+    border: 1px solid var(--border); border-radius: 10px;
+    padding: 1px 7px; flex: 0 0 auto; font-family: "SF Mono", "Menlo", monospace;
+  }
+  .step-goal { font-size: 11.5px; color: var(--text-secondary); padding: 9px 11px 0; }
+  .step-goal b { color: var(--text); font-weight: 600; }
+  .step-say {
+    margin: 8px 11px; padding: 11px 12px 11px 13px;
+    background: #f3f8f5; border-left: 3px solid var(--primary);
+    border-radius: 0 8px 8px 0; font-size: 13.5px; line-height: 1.9;
+    color: #15402c; position: relative;
+  }
+  .step-say .copy {
+    position: absolute; top: 6px; right: 6px;
+    font-size: 10.5px; padding: 2px 7px; border-radius: 5px;
+    border: 1px solid var(--border); background: #fff;
+    color: var(--text-secondary); cursor: pointer;
+    opacity: 0; transition: opacity .15s;
+  }
+  .step-say:hover .copy { opacity: 1; }
+  .step-say .copy:hover { border-color: var(--primary); color: var(--primary); }
+  .step-say em {
+    font-style: normal; background: #fff3c4;
+    padding: 0 3px; border-radius: 3px; font-weight: 600; color: #6b4a00;
+  }
+  .step-say strong { color: var(--primary); font-weight: 700; }
+  .step-why { margin: 0 11px 10px; }
+  .step-why summary {
+    font-size: 11.5px; color: var(--text-muted);
+    cursor: pointer; list-style: none; outline: none;
+  }
+  .step-why summary::-webkit-details-marker { display: none; }
+  .step-why summary::before { content: '▸ '; }
+  .step-why[open] summary::before { content: '▾ '; }
+  .step-why p {
+    font-size: 11.5px; color: var(--text-secondary); line-height: 1.75;
+    margin-top: 6px; padding-left: 9px; border-left: 2px solid var(--border);
+  }
+  .script-foot { padding: 2px 12px 12px; }
+  .script-reset {
+    width: 100%; padding: 7px; font-size: 12px;
+    border: 1px dashed var(--border); background: #fff;
+    border-radius: 7px; color: var(--text-muted); cursor: pointer;
+  }
+  .script-reset:hover { border-color: var(--primary); color: var(--primary); }
+  .script-src {
+    font-size: 10.5px; color: var(--text-muted);
+    text-align: center; margin-top: 7px; line-height: 1.5;
+  }
+
   .record-btn {
     width: 120px; height: 120px; border-radius: 50%;
     border: 4px solid var(--primary);
@@ -435,7 +563,7 @@ const WEBHOOK_FIELDS = {
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-04k';
+const APP_VERSION = '2026-08-04o';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -1773,6 +1901,153 @@ function switchTab(tab) {
   renderMain();
 }
 
+// ========== 通话话术（来源：《视频号线索初接话术及流程》） ==========
+// {N} 会在渲染时替换为当前客户称呼；<em> 高亮关键动作词，<strong> 高亮核心卖点
+const CALL_SCRIPT = {
+  title: '📞 高效电话转化法',
+  time: '全程 60-90 秒',
+  rule: '<b>情绪高于内容，先给钩子再给行动。</b><br>'
+      + '❌ 别一上来就说"您好，我是XX公司的"<br>'
+      + '✅ 先自然问候：<em>"您好，上午好，看到您视频号联系我们想咨询项目合作"</em>',
+  steps: [
+    {
+      name: '身份唤醒',
+      sec: '5-10秒',
+      goal: '建立联系，<b>不让用户反感挂断</b>',
+      say: '喂，<em>{N}</em>您好，我是刚才在视频号里给您发私信/留下联系方式的<strong>合作顾问</strong>。刚才看您<em>评论了我们的XX视频</em>，所以赶紧给您回个电话。',
+      why: '结合平台（视频号）和具体互动行为（点赞、评论、留资）作为切入点，这不仅是一个合规的引流"由头"，也瞬间提醒了用户你是谁，让他觉得不是骚扰电话。',
+    },
+    {
+      name: '价值给予',
+      sec: '30-40秒',
+      core: true,
+      goal: '给出无法拒绝的"诱饵"，把重点从<b>"加入社群"转移到"领取专属福利"</b>',
+      say: '您不是一直对<strong>大健康方面项目</strong>感兴趣吗？我手头上正好有一份关于<strong>26年大健康的内部实操教学和行情资料</strong>，这是我们<em>特意给感兴趣的老板准备的</em>，我直接发到我们内部的<strong>粉丝专属群</strong>里面了，里面都是和您一样对大健康感兴趣的老板，您看我拉您进群大家一起交流交流？',
+      why: '视频号的核心在于信任关系。群发的消息用户很难重视，但电话里"1对1"送出的专属福利，赋予了极高的"专属感"。话术要明确告诉用户："这不是谁都能领的，是专门为你准备的。"',
+    },
+    {
+      name: '简化路径',
+      sec: '10-15秒',
+      goal: '把"加微信"变得<b>无脑、简单、直接</b> —— 在通话过程中就完成添加',
+      say: '您这个手机号就是您的微信么？您现在去看一下您的手机微信，有个<em>"好友申请"</em>。您<em>点一下"通过"</em>，然后我把您拉到群里，您直接自己领就行了，<strong>特简单</strong>！',
+      why: '这个环节的核心是"精简"。通过电话口述添加微信，引导用户仅需点击"通过"。话术中明确指示动作（"点一下通过"），能极大地降低用户的行动阻力。',
+    },
+  ],
+};
+
+// 步骤勾选状态（按线索维度，仅存内存：每次刷新/换人重新开始）
+let scriptChecked = {};
+
+// 生成电话里念得出口的称呼：
+//   纯中文姓名 → 张先生 / 李女士 / 王老板（依据已填性别，未填用「老板」更稳妥）
+//   复姓识别 → 欧阳先生（而不是「欧先生」）
+//   阿/小/老 开头的昵称 → 原样称呼（「阿伟」不该变成「阿老板」）
+//   公司名、长昵称 → 直接用「老板」，避免电话里照读一长串
+const COMPOUND_SURNAMES = ['欧阳','司马','上官','诸葛','东方','独孤','慕容','宇文',
+  '皇甫','尉迟','公孙','令狐','夏侯','长孙','轩辕','南宫','西门','百里'];
+
+function leadSalutation(l) {
+  const raw = (l && (l.name || l.account_name) || '').trim();
+  if (!raw) return '您';
+  const gender = (leadExtras[l && l.record_id] || {}).gender;
+  const suffix = gender === '女' ? '女士' : (gender === '男' ? '先生' : '老板');
+
+  // 昵称型：阿伟 / 小李 / 老王 —— 直接叫，别加后缀
+  if (/^[阿小老][\u4e00-\u9fa5]{1,2}$/.test(raw)) return raw;
+  // 复姓：欧阳志远 → 欧阳先生
+  const cs = COMPOUND_SURNAMES.find(s => raw.startsWith(s));
+  if (cs && /^[\u4e00-\u9fa5]{3,4}$/.test(raw)) return cs + suffix;
+  // 常规中文姓名：张伟 → 张老板
+  if (/^[\u4e00-\u9fa5]{2,4}$/.test(raw)) return raw[0] + suffix;
+  // 公司名 / 长昵称：只称呼后缀
+  if (/^[\u4e00-\u9fa5]{5,}$/.test(raw) || raw.length > 6) return suffix;
+  return raw;  // 短英文名等，原样念
+}
+
+function renderScriptPanel(l) {
+  const salute = leadSalutation(l);
+  const id = l ? l.record_id : '_';
+  const checked = scriptChecked[id] || {};
+  const doneCount = CALL_SCRIPT.steps.filter((_, i) => checked[i]).length;
+  const pct = Math.round(doneCount / CALL_SCRIPT.steps.length * 100);
+
+  const stepsHtml = CALL_SCRIPT.steps.map((s, i) => {
+    const done = !!checked[i];
+    const sayHtml = s.say.replace(/\{N\}/g, escapeHtml(salute));
+    return `
+      <div class="step-card ${done ? 'done' : ''} ${s.core ? 'core' : ''}">
+        <div class="step-top" onclick="toggleScriptStep(${i})">
+          <div class="step-chk">✓</div>
+          <div class="step-name">${i + 1}. ${s.name}</div>
+          ${s.core ? '<div class="step-tag">核心</div>' : ''}
+          <div class="step-sec">${s.sec}</div>
+        </div>
+        <div class="step-goal">🎯 ${s.goal}</div>
+        <div class="step-say">
+          <button class="copy" onclick="copyScriptLine(${i})">复制</button>
+          <span id="sayText${i}">${sayHtml}</span>
+        </div>
+        <details class="step-why"><summary>为什么这么说</summary><p>${escapeHtml(s.why)}</p></details>
+      </div>`;
+  }).join('');
+
+  return `
+    <div class="script-panel">
+      <div class="script-head">
+        <div class="t"><span>${CALL_SCRIPT.title}</span><span class="time">${CALL_SCRIPT.time}</span></div>
+        <div class="sub">跟着念 · 点标题打钩记录进度（${doneCount}/${CALL_SCRIPT.steps.length}）</div>
+        <div class="script-bar"><i style="width:${pct}%"></i></div>
+      </div>
+      <div class="script-rule">${CALL_SCRIPT.rule}</div>
+      <div class="script-body">${stepsHtml}</div>
+      <div class="script-foot">
+        <button class="script-reset" onclick="resetScript()">↺ 重置勾选（下一通电话）</button>
+        <div class="script-src">话术来源：《视频号线索初接话术及流程》</div>
+      </div>
+    </div>`;
+}
+
+function refreshScriptPanel() {
+  const col = document.getElementById('scriptCol');
+  if (col && selectedLead) col.innerHTML = renderScriptPanel(selectedLead);
+}
+
+function toggleScriptStep(i) {
+  if (!selectedLead) return;
+  const id = selectedLead.record_id;
+  scriptChecked[id] = scriptChecked[id] || {};
+  scriptChecked[id][i] = !scriptChecked[id][i];
+  refreshScriptPanel();
+}
+
+function resetScript() {
+  if (!selectedLead) return;
+  scriptChecked[selectedLead.record_id] = {};
+  refreshScriptPanel();
+}
+
+function copyScriptLine(i) {
+  const el = document.getElementById('sayText' + i);
+  if (!el) return;
+  const text = el.innerText || el.textContent || '';
+  const done = () => toast('话术已复制', 'success');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+  } else {
+    fallbackCopy(text, done);
+  }
+}
+
+function fallbackCopy(text, cb) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;top:-999px;opacity:0;';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); cb && cb(); } catch (e) { toast('复制失败，请手动选中', 'error'); }
+  document.body.removeChild(ta);
+}
+
 function renderMain() {
   const container = document.getElementById('mainContent');
 
@@ -1792,6 +2067,8 @@ function renderMain() {
     const l = selectedLead;
     const synced = syncedLeads[l.record_id];
     container.innerHTML = `
+     <div class="call-layout">
+      <div class="work-col">
       <div class="call-panel">
         <div class="lead-info">
           <div style="display:flex;gap:28px;align-items:flex-end;flex-wrap:wrap;">
@@ -1811,7 +2088,12 @@ function renderMain() {
           </div>
           ${ownerChipDetail(l)}
           ${l.feedback ? `<div style="margin-top:12px;"><div class="label">之前反馈</div><div style="font-size:13px;color:#666;">${l.feedback}</div></div>` : ''}
-          <div class="extra-info">
+        </div>
+        <div id="timerDisplay" class="timer" style="display:none;">00:00</div>
+        <button class="record-btn" id="recordBtn" onclick="toggleRecording()">开始录音</button>
+        <div id="uploadArea"></div>
+        <div class="hint" id="recordHint">点击后开始录音，用手机拨打客户，开启外放</div>
+        <div class="extra-info">
             <div class="extra-title">📇 客户补充信息（填完点回传 → 智能表格）</div>
             ${synced ? `<div class="synced-note">✅ 该客户已于 <b>${synced}</b> 回传，无需重复回传</div>` : ''}
             <div class="extra-grid">
@@ -1838,14 +2120,12 @@ function renderMain() {
             </div>
             <button class="sync-btn" id="syncBtn" ${synced ? 'disabled' : ''} onclick="syncLeadExtra()">${synced ? '✅ 已回传' : '🚀 回传客户信息'}</button>
             <div class="sync-status" id="syncStatus">${synced ? '该客户已回传，按钮已禁用' : ''}</div>
-          </div>
         </div>
-        <div id="timerDisplay" class="timer" style="display:none;">00:00</div>
-        <button class="record-btn" id="recordBtn" onclick="toggleRecording()">开始录音</button>
-        <div id="uploadArea"></div>
-        <div class="hint" id="recordHint">点击后开始录音，用手机拨打客户，开启外放</div>
         ${renderLeadRecordings(l)}
-      </div>`;
+      </div>
+      </div>
+      <div class="script-col" id="scriptCol">${renderScriptPanel(l)}</div>
+     </div>`;
       initExtraFields(l);
       autoLoadAnalyses(l);
   } else {
@@ -1875,6 +2155,8 @@ function saveExtra(key, val) {
   leadExtras[id] = leadExtras[id] || {};
   leadExtras[id][key] = val;
   try { localStorage.setItem('outbound_extras', JSON.stringify(leadExtras)); } catch(e) {}
+  // 性别影响话术里的称呼（X先生 / X女士 / X老板），实时刷新话术面板
+  if (key === 'gender') refreshScriptPanel();
 }
 function initExtraFields(l) {
   if (!l) return;
