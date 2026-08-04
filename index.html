@@ -435,7 +435,7 @@ const WEBHOOK_FIELDS = {
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-04i';
+const APP_VERSION = '2026-08-04j';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -1794,11 +1794,15 @@ function renderMain() {
     container.innerHTML = `
       <div class="call-panel">
         <div class="lead-info">
-          <div class="label">客户名称</div>
-          <div class="value">${l.name || l.account_name || '未命名'}</div>
-          <div style="margin-top:12px;">
-            <div class="label">联系电话</div>
-            <div class="phone-value">${l.phone || '无号码'}</div>
+          <div style="display:flex;gap:28px;align-items:flex-end;flex-wrap:wrap;">
+            <div style="min-width:0;flex:1 1 auto;">
+              <div class="label">客户名称</div>
+              <div class="value" style="font-size:18px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${l.name || l.account_name || '未命名'}</div>
+            </div>
+            <div style="flex:0 0 auto;">
+              <div class="label">联系电话</div>
+              <div class="phone-value">${l.phone || '无号码'}</div>
+            </div>
           </div>
           <div style="display:flex;gap:20px;margin-top:12px;">
             <div><div class="label">平台</div><div class="value" style="font-size:13px;">${l.platform || '-'}</div></div>
