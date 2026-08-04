@@ -264,6 +264,40 @@
   .upload-status.error { color: var(--danger); }
   .upload-status.uploading { color: var(--warning); }
 
+  /* 录音回放 + 转写分析 */
+  .recordings-block { margin-top: 16px; border-top: 1px dashed var(--border); padding-top: 14px; }
+  .recordings-title { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 10px; }
+  .recordings-empty { font-size: 12px; color: var(--text-muted); padding: 8px 0; }
+  .rec-item { background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 12px; }
+  .rec-meta { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+  .rec-audio { width: 100%; margin-bottom: 8px; }
+  .rec-noaudio { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+  .rec-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .score-pill { display: inline-block; min-width: 34px; text-align: center; background: #fff0f6; color: #c2255c; border: 1px solid #faa2c1; border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 700; }
+  .rec-status { font-size: 12px; color: var(--text-muted); margin: 8px 0; min-height: 16px; }
+  .rec-analysis:empty { display: none; }
+  .analysis-card { background: #f8f9fa; border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+  .analysis-head { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
+  .score-big { font-size: 32px; font-weight: 800; line-height: 1; }
+  .score-unit { font-size: 14px; font-weight: 600; margin-left: 2px; }
+  .analysis-summary { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+  .dims { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+  .dim-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+  .dim-name { width: 72px; color: var(--text-secondary); flex: none; }
+  .dim-bar { flex: 1; height: 8px; background: var(--border); border-radius: 999px; overflow: hidden; }
+  .dim-bar i { display: block; height: 100%; border-radius: 999px; }
+  .dim-val { width: 42px; text-align: right; color: var(--text-muted); flex: none; }
+  .proscons { display: flex; gap: 12px; }
+  .pc { flex: 1; background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 10px; }
+  .pc-title { font-size: 12px; font-weight: 700; margin-bottom: 6px; }
+  .pc.pros .pc-title { color: #2f9e44; }
+  .pc.cons .pc-title { color: #e8590c; }
+  .pc ul { margin: 0; padding-left: 18px; }
+  .pc li { font-size: 12px; color: var(--text-secondary); line-height: 1.7; }
+  .transcript { margin-top: 10px; font-size: 12px; }
+  .transcript summary { cursor: pointer; color: var(--text-secondary); }
+  .transcript-body { margin-top: 8px; white-space: pre-wrap; font-size: 13px; line-height: 1.7; color: var(--text-secondary); max-height: 320px; overflow-y: auto; background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 10px; }
+
   /* History */
   .calls-table {
     width: 100%; border-collapse: collapse; font-size: 13px;
@@ -284,6 +318,9 @@
   .btn-primary { background: var(--primary); color: #fff; }
   .btn-sm { padding: 4px 10px; font-size: 12px; }
   .btn-ghost { background: transparent; color: var(--text-secondary); border: 1px solid var(--border); }
+  .btn-secondary { background: #e7f5ff; color: #1971c2; border: 1px solid #a5d8ff; }
+  .btn-secondary:hover { background: #d0ebff; }
+  .btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
   .btn-danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
 
   .file-link {
@@ -370,7 +407,19 @@ const WEBHOOK_PROXY_URL = 'https://outbound-webhook-proxy.yiru220.workers.dev';
 
 // GitHub 上传统一走 Cloudflare Worker 代理（同一个 Worker 的 /github 路由）。
 // Token 由 Worker 持有（Cloudflare Secret），前端不存放，全员免配置即可上传。
-const GITHUB_PROXY_URL = 'https://outbound-webhook-proxy.yiru220.workers.dev/github';
+const WORKER_BASE = 'https://outbound-webhook-proxy.yiru220.workers.dev';
+const GITHUB_PROXY_URL = WORKER_BASE + '/github';
+// 录音转写 + AI 分析代理（同一个 Worker 的 /transcribe 路由，持有 OPENAI_API_KEY）。
+const TRANSCRIBE_PROXY_URL = WORKER_BASE + '/transcribe';
+
+// 把 GitHub blob 页链接转为 raw 直链（用于浏览器播放与 Worker 拉取音频）。
+function rawUrlOf(call) {
+  if (call.github_raw) return call.github_raw;
+  if (!call.github_url) return '';
+  return call.github_url
+    .replace('https://github.com/', 'https://raw.githubusercontent.com/')
+    .replace('/blob/', '/');
+}
 // 回传字段映射：本表字段 key -> 目标表「字段ID」(来自「11-线索回执表」真实配置)。
 // 用 field_id 而非列名，避免列名存在空格/异体字导致 webhook 报 field not exists。
 const WEBHOOK_FIELDS = {
@@ -383,7 +432,7 @@ const WEBHOOK_FIELDS = {
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-04g';
+const APP_VERSION = '2026-08-04h';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -1788,8 +1837,10 @@ function renderMain() {
         <button class="record-btn" id="recordBtn" onclick="toggleRecording()">开始录音</button>
         <div id="uploadArea"></div>
         <div class="hint" id="recordHint">点击后开始录音，用手机拨打客户，开启外放</div>
+        ${renderLeadRecordings(l)}
       </div>`;
       initExtraFields(l);
+      autoLoadAnalyses(l);
   } else {
     // History tab
     const myCalls = calls.filter(c => c.user_name === currentUser);
@@ -1904,19 +1955,192 @@ function renderCallRow(c) {
       : `<button class="btn btn-sm btn-ghost" onclick="downloadAudio('${c.call_id}')">下载</button>`;
   }
 
+  const scoreBadge = (c.analysis && c.analysis.score != null)
+    ? `<span class="score-pill" title="综合得分">${c.analysis.score}</span> ` : '';
+  const analysisBtn = `<button class="btn btn-sm btn-secondary" onclick="transcribeCall('${c.call_id}')">🎯 转写分析</button>`;
   return `
     <tr>
-      <td>${c.lead_name || '-'}</td>
+      <td>${scoreBadge}${c.lead_name || '-'}</td>
       <td style="font-family:monospace;">${c.lead_phone || '-'}</td>
       <td style="font-size:12px;">${c.started_at || '-'}</td>
       <td>${c.duration || '-'}</td>
       <td>${statusHtml}</td>
-      <td style="display:flex;gap:6px;">
+      <td style="display:flex;gap:6px;flex-wrap:wrap;">
+        ${analysisBtn}
         ${actionsHtml}
         <button class="btn btn-sm btn-danger" onclick="deleteCall('${c.call_id}')">删除</button>
       </td>
     </tr>
   `;
+}
+
+// ========== 录音回放 + 一键转写分析 ==========
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, m =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+}
+
+// 该客户的历史通话录音区块
+function renderLeadRecordings(l) {
+  const phone = (l.phone || '').trim();
+  const name = (l.name || l.account_name || '').trim();
+  const list = calls.filter(c =>
+    (phone && c.lead_phone === phone) || (name && c.lead_name === name)
+  );
+  if (list.length === 0) {
+    return `<div class="recordings-block"><div class="recordings-title">📼 该客户的通话录音</div><div class="recordings-empty">尚未为该客户录制通话</div></div>`;
+  }
+  list.sort((a, b) => String(b.started_at || '').localeCompare(String(a.started_at || '')));
+  return `<div class="recordings-block">
+    <div class="recordings-title">📼 该客户的通话录音（${list.length}）</div>
+    ${list.map(c => renderRecordingItem(c)).join('')}
+  </div>`;
+}
+
+function renderRecordingItem(c) {
+  const src = rawUrlOf(c) || (c.audio_data && c.audio_data.startsWith('data:') ? c.audio_data : '');
+  const hasAudio = !!src;
+  const time = c.started_at || '-';
+  const dur = c.duration || '-';
+  const analyzed = c.analysis && (c.analysis.score != null || c.analysis.transcript);
+  return `
+  <div class="rec-item" id="rec-${c.call_id}">
+    <div class="rec-meta"><b>${escapeHtml(time)}</b> · 时长 ${escapeHtml(dur)} · ${escapeHtml(c.user_name || '')}</div>
+    ${hasAudio
+      ? `<audio class="rec-audio" controls preload="none" src="${src}"></audio>`
+      : `<div class="rec-noaudio">无可播放音频（本地录音已丢失或未上传）</div>`}
+    <div class="rec-actions">
+      <button class="btn btn-sm btn-secondary" id="txbtn-${c.call_id}" onclick="transcribeCall('${c.call_id}')" ${hasAudio ? '' : 'disabled title="无可分析音频"'}>🎯 转写分析</button>
+      ${analyzed && c.analysis.score != null ? `<span class="score-pill" title="综合得分">${c.analysis.score}分</span>` : ''}
+    </div>
+    <div class="rec-status" id="txstatus-${c.call_id}">${analyzed ? '' : '点击上方按钮，自动转文字 + 打分 + 优缺点分析'}</div>
+    <div class="rec-analysis" id="analysis-${c.call_id}">${analyzed ? renderAnalysis(c.analysis) : ''}</div>
+  </div>`;
+}
+
+function renderAnalysis(a) {
+  const score = (a.score != null) ? a.score : '—';
+  const scoreColor = (a.score >= 80) ? '#2f9e44' : (a.score >= 60 ? '#f08c00' : '#e03131');
+  const dims = (a.dimensions || []).map(d => {
+    const pct = Math.max(0, Math.min(100, (d.score / 10) * 100));
+    const dc = d.score >= 8 ? '#2f9e44' : (d.score >= 6 ? '#f08c00' : '#e03131');
+    return `<div class="dim-row"><span class="dim-name">${escapeHtml(d.name)}</span><span class="dim-bar"><i style="width:${pct}%;background:${dc}"></i></span><span class="dim-val">${d.score}/10</span></div>`;
+  }).join('');
+  const pros = (a.strengths || []).map(s => `<li>${escapeHtml(s)}</li>`).join('');
+  const cons = (a.weaknesses || []).map(s => `<li>${escapeHtml(s)}</li>`).join('');
+  const transcript = a.transcript || '';
+  return `
+    <div class="analysis-card">
+      <div class="analysis-head">
+        <div class="score-big" style="color:${scoreColor}">${score}<span class="score-unit">分</span></div>
+        <div class="analysis-summary">${escapeHtml(a.summary || '')}</div>
+      </div>
+      ${dims ? `<div class="dims">${dims}</div>` : ''}
+      <div class="proscons">
+        <div class="pc pros"><div class="pc-title">✅ 优点</div><ul>${pros}</ul></div>
+        <div class="pc cons"><div class="pc-title">🔧 待改进</div><ul>${cons}</ul></div>
+      </div>
+      ${transcript ? `<details class="transcript"><summary>📝 转写全文</summary><div class="transcript-body">${escapeHtml(transcript)}</div></details>` : ''}
+    </div>`;
+}
+
+// 调用 Worker /transcribe：转写 + 打分 + 优缺点分析，结果存本机并同步 GitHub
+async function transcribeCall(callId) {
+  const call = calls.find(c => c.call_id === callId);
+  if (!call) return;
+  const btn = document.getElementById('txbtn-' + callId);
+  const statusEl = document.getElementById('txstatus-' + callId);
+  const raw = rawUrlOf(call);
+  const audio = (!raw && call.audio_data) ? call.audio_data : null;
+  if (!raw && !audio) {
+    if (statusEl) statusEl.innerHTML = '<span style="color:var(--danger)">无可分析音频</span>';
+    return;
+  }
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ 分析中...'; }
+  if (statusEl) statusEl.innerHTML = '<span style="color:var(--warning)">正在转写并分析，请稍候（约 10-30 秒）...</span>';
+  try {
+    const resp = await fetch(TRANSCRIBE_PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(raw
+        ? { url: raw, name: (call.github_path || 'audio.webm').split('/').pop() }
+        : { audio: audio, name: 'audio.webm' }),
+    });
+    const j = await resp.json().catch(() => ({}));
+    if (!resp.ok || j.error) throw new Error(j.error || ('HTTP ' + resp.status));
+    call.analysis = {
+      transcript: j.transcript || '',
+      score: (j.score != null) ? j.score : null,
+      dimensions: j.dimensions || [],
+      strengths: j.strengths || [],
+      weaknesses: j.weaknesses || [],
+      summary: j.summary || '',
+      analyzed_at: new Date().toISOString(),
+    };
+    updateCallInStorage(call);
+    const box = document.getElementById('analysis-' + callId);
+    if (box) box.innerHTML = renderAnalysis(call.analysis);
+    if (statusEl) statusEl.textContent = '';
+    if (call.github_path) {
+      try {
+        const apath = call.github_path.replace(/\.webm$/i, '.analysis.json');
+        await uploadTextToGitHub(apath, JSON.stringify(call.analysis, null, 2),
+          `📊 录音分析: ${call.lead_name || ''} ${call.started_at || ''}`);
+      } catch (e) { console.warn('分析 JSON 同步失败(不影响本地):', e); }
+    }
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 重新分析'; }
+    if (currentTab === 'history') renderMain();
+    toast('分析完成 · 综合 ' + (call.analysis.score != null ? call.analysis.score + '分' : '—'), 'success');
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = '🎯 重新分析'; }
+    if (statusEl) statusEl.innerHTML = '<span style="color:var(--danger)">分析失败: ' + escapeHtml(e.message) + '</span>';
+    toast('分析失败: ' + e.message, 'error');
+  }
+}
+
+// 把文本（UTF-8 安全）推到 GitHub（复用上传代理）
+async function uploadTextToGitHub(path, text, message) {
+  if (!GITHUB_PROXY_URL) throw new Error('上传代理未配置');
+  const content = btoa(unescape(encodeURIComponent(text)));
+  const resp = await fetch(GITHUB_PROXY_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path, content, message, branch: GITHUB_BRANCH }),
+  });
+  if (!resp.ok) {
+    const e = await resp.json().catch(() => ({}));
+    throw new Error(e.error || ('HTTP ' + resp.status));
+  }
+  return resp.json();
+}
+
+// 跨设备：本地无分析但有 GitHub 分析 JSON 时，自动拉取补全
+async function autoLoadAnalyses(l) {
+  if (!l) return;
+  const phone = (l.phone || '').trim();
+  const name = (l.name || l.account_name || '').trim();
+  const list = calls.filter(c =>
+    (phone && c.lead_phone === phone) || (name && c.lead_name === name));
+  for (const c of list) {
+    if (c.analysis && (c.analysis.score != null || c.analysis.transcript)) continue;
+    const raw = rawUrlOf(c);
+    if (!raw) continue;
+    const aurl = raw.replace(/\.webm$/i, '.analysis.json');
+    try {
+      const r = await fetch(aurl);
+      if (!r.ok) continue;
+      const a = await r.json();
+      if (!a || typeof a !== 'object') continue;
+      c.analysis = a;
+      updateCallInStorage(c);
+      const box = document.getElementById('analysis-' + c.call_id);
+      if (box) box.innerHTML = renderAnalysis(a);
+      const btn = document.getElementById('txbtn-' + c.call_id);
+      if (btn) btn.textContent = '🔄 重新分析';
+      const st = document.getElementById('txstatus-' + c.call_id);
+      if (st) st.textContent = '';
+    } catch (e) { /* 忽略，按需手动分析 */ }
+  }
 }
 
 // ========== Recording ==========
@@ -2156,6 +2380,7 @@ async function uploadToGitHub(call, dataUrl) {
   // Update call record
   call.uploaded = true;
   call.github_url = githubUrl;
+  call.github_raw = rawUrlOf({ github_url: githubUrl });
   call.github_path = filePath;
   call.upload_error = null;
   updateCallInStorage(call);
