@@ -424,13 +424,14 @@ const WEBHOOK_URL = 'https://qyapi.weixin.qq.com/cgi-bin/wedoc/smartsheet/webhoo
 // 回传代理地址（Cloudflare Worker，用于绕过浏览器跨域）。为空时回退直连（会跨域失败）。
 // 部署 Worker 后把地址填进「⚙️上传设置→回传代理地址」，或由管理员直接填这里并重新部署，全员立即生效。
 const WEBHOOK_PROXY_URL = 'https://outbound-webhook-proxy.yiru220.workers.dev';
-// 回传字段名映射：本表字段 key -> 目标智能表格「列名」。若列名不同，只改这里即可。
+// 回传字段映射：本表字段 key -> 目标表「字段ID」(来自「11-线索回执表」真实配置)。
+// 用 field_id 而非列名，避免列名存在空格/异体字导致 webhook 报 field not exists。
 const WEBHOOK_FIELDS = {
-  gender:   '性别',
-  province: '省',
-  city:     '市',
-  hasStore: '是否自有门店',
-  phone:    '手机号'
+  gender:   'fUGe6b',   // 性别 (单选)
+  province: 'fu0uQ1',   // 省 (单选)
+  city:     'fz0DpX',   // 市 (文本)
+  hasStore: 'fVBgw9',   // 是否自有门店 (单选)
+  phone:    'fuvsCp'    // 手机号 (数字)
 };
 
 // ========== Team ==========
@@ -1919,7 +1920,7 @@ async function syncLeadExtra() {
   values[F.province] = ex.province || '';
   values[F.city]     = ex.city || '';
   values[F.hasStore] = ex.hasStore || '';
-  values[F.phone]    = phone;
+  values[F.phone]    = Number(String(phone).replace(/\D/g, '')) || 0;
   const payload = { add_records: [ { values: values } ] };
   const btn = document.getElementById('syncBtn');
   const st = document.getElementById('syncStatus');
