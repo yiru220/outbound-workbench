@@ -87,6 +87,21 @@ async function handleGitHub(request, env) {
   }
 
   const apiUrl = `https://api.github.com/repos/${GITHUB_REPO}/contents/${path}`;
+
+  // 未提供 sha 时自动解析（幂等更新：重复上传/重复分析可覆盖，避免 409）
+  if (!sha) {
+    try {
+      const g = await fetch(apiUrl, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'outbound-github-proxy',
+        },
+      });
+      if (g.ok) { const gj = await g.json(); sha = gj.sha; }
+    } catch (e) { /* 忽略，按新文件处理 */ }
+  }
+
   const ghBody = JSON.stringify({
     message: message || 'upload',
     content,
