@@ -21,7 +21,7 @@ const GITHUB_BRANCH = 'main';
 
 // Worker 代码版本。改动代码时同步 +1，方便判断 Cloudflare 是否已部署最新版。
 // 自检：浏览器直接打开 https://outbound-webhook-proxy.yiru220.workers.dev/health
-const WORKER_VERSION = '2026-08-04j-multibackend';
+const WORKER_VERSION = '2026-08-04l-siliconflow';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -300,8 +300,10 @@ async function handleTranscribe(request, env) {
   const chain = providerChain(env, want);
   if (!chain.length) {
     return json({
-      error: '没有可用的转写后端。三选一即可：①（推荐，免费）在 Worker 加 Secret SILICONFLOW_API_KEY；'
-        + '②在 wrangler.toml 绑定 Workers AI（[ai] binding = "AI"）用每日免费额度；③加 OPENAI_API_KEY 走付费。',
+      error: '没有可用的转写后端。请在 Cloudflare 控制台 → Worker → Settings → Variables and Secrets '
+        + '添加 Secret：SILICONFLOW_API_KEY（硅基流动，免费不限量，去 cloud.siliconflow.cn 注册领取），'
+        + '保存后点 Deploy 重新部署即可。（可选替代：OPENAI_API_KEY 走付费，'
+        + '或在 dashboard 加 Workers AI binding 且变量名为 AI）',
     }, 500);
   }
 
