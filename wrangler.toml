@@ -2,11 +2,16 @@ name = "outbound-webhook-proxy"
 main = "proxy/worker.js"
 compatibility_date = "2024-09-23"
 
-# Workers AI 绑定：Worker 可直接调用 Cloudflare 自带 AI 模型（whisper 转写 + qwen 分析），
-# 无需任何 API Key。免费额度 10000 neurons/天 ≈ 240 分钟音频，UTC 00:00 重置。
-# 转写后端优先级见 proxy/worker.js：硅基流动(免费) → Workers AI(免费额度) → OpenAI(付费)
-[ai]
-binding = "AI"
+# 转写后端优先级见 proxy/worker.js：硅基流动(免费不限量) → Workers AI(免费额度) → OpenAI(付费)
+# 当前采用「硅基流动」方案：只需在 Cloudflare 控制台加 Secret SILICONFLOW_API_KEY 即可，
+# 无需任何 binding，部署不会因缺少绑定而失败。
+#
+# ⚠️ 不要在这里写 [ai] binding = "AI"。
+#   Cloudflare Git 部署时若 wrangler.toml 声明了 AI 绑定，而 dashboard 上没有对应绑定，
+#   构建会直接失败（Latest build failed / No workers bound to this worker）。
+#   若日后确实要用 Workers AI 免费额度，必须：
+#     dashboard → Worker → Bindings → Add binding → Workers AI → Variable name 填 AI，
+#   再在此处加回 [ai] binding = "AI"，两边同时存在才能部署成功。
 
 # Cloudflare Worker（Git 部署模式）配置。
 # 触发：在 Cloudflare 控制台 Workers & Pages → Create application → Connect to Git
