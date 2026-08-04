@@ -355,10 +355,11 @@
       <span id="settingsStatus"></span>
     </div>
     <div class="settings-panel" id="settingsPanel">
-      <label>GitHub Personal Access Token (Fine-grained)</label>
-      <input type="password" id="ghToken" placeholder="github_pat_...">
+      <label>GitHub Personal Access Token（选填）</label>
+      <input type="password" id="ghToken" placeholder="github_pat_...（一般无需填写）">
       <div class="help-text">
-        需要具有 <code>contents:write</code> 权限的 token。<br>
+        <b>录音已统一通过上传代理自动上传，全员无需填写 Token。</b><br>
+        此字段仅在「关闭上传代理」时作为直连兜底用：需具有 <code>contents:write</code> 权限的 token。<br>
         <a href="https://github.com/settings/tokens?type=beta" target="_blank">点此创建 Fine-grained token →</a><br>
         仓库选 <code>yiru220/outbound-workbench</code>，权限选 <b>Contents: Read and write</b>
       </div>
@@ -424,6 +425,10 @@ const WEBHOOK_URL = 'https://qyapi.weixin.qq.com/cgi-bin/wedoc/smartsheet/webhoo
 // 回传代理地址（Cloudflare Worker，用于绕过浏览器跨域）。为空时回退直连（会跨域失败）。
 // 部署 Worker 后把地址填进「⚙️上传设置→回传代理地址」，或由管理员直接填这里并重新部署，全员立即生效。
 const WEBHOOK_PROXY_URL = 'https://outbound-webhook-proxy.yiru220.workers.dev';
+
+// GitHub 上传统一走 Cloudflare Worker 代理（同一个 Worker 的 /github 路由）。
+// Token 由 Worker 持有（Cloudflare Secret），前端不存放，全员免配置即可上传。
+const GITHUB_PROXY_URL = 'https://outbound-webhook-proxy.yiru220.workers.dev/github';
 // 回传字段映射：本表字段 key -> 目标表「字段ID」(来自「11-线索回执表」真实配置)。
 // 用 field_id 而非列名，避免列名存在空格/异体字导致 webhook 报 field not exists。
 const WEBHOOK_FIELDS = {
@@ -1612,7 +1617,8 @@ let USER_MAP = {};
 let leadExtras = {};
 try { leadExtras = JSON.parse(localStorage.getItem('outbound_extras') || '{}'); } catch(e) { leadExtras = {}; }
 
-// GitHub token from localStorage
+// GitHub 上传统一走 Worker 代理（GITHUB_PROXY_URL），前端不存放 Token。
+// 此处 token 仅作为「关闭代理时」的直连兜底（选填，由用户在设置里填）。
 function getGHToken() {
   return (localStorage.getItem('outbound_gh_token') || '').trim();
 }
@@ -1690,7 +1696,7 @@ function init() {
   } catch(e) { buildUserDropdown(); }
   document.getElementById('searchInput').oninput = renderLeads;
 
-  // Restore GitHub token
+  // Restore GitHub token（上传统一走 Worker 代理，此字段仅为关闭代理时的直连兜底，可选）
   const savedToken = getGHToken();
   if (savedToken) {
     document.getElementById('ghToken').value = savedToken;
@@ -1814,7 +1820,7 @@ function renderMain() {
     }
 
     const l = selectedLead;
-    const hasGH = !!getGHToken();
+    const hasGH = !!(GITHUB_PROXY_URL || getGHToken());
     container.innerHTML = `
       <div class="call-panel">
         <div class="lead-info">
@@ -2166,9 +2172,6 @@ function updateUploadUI(status, msg) {
 
 // ========== GitHub API Upload ==========
 async function uploadToGitHub(call, dataUrl) {
-  const token = getGHToken();
-  if (!token) throw new Error('未配置 GitHub Token');
-
   // Build file path: outbound/recordings/YYYY-MM/username/客户名_上传人_YYYYMMDD_HHMMSS.webm
   const now = new Date();
   const month = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
@@ -2185,27 +2188,38 @@ async function uploadToGitHub(call, dataUrl) {
 
   updateUploadUI('uploading');
 
-  // GitHub Contents API: PUT /repos/{owner}/{repo}/contents/{path}
-  const apiUrl = `https://api.github.com/repos/${GITHUB_REPO}/contents/${filePath}`;
-  const body = JSON.stringify({
-    message: `📞 外呼录音: ${call.lead_name} | ${call.user_name} | ${call.started_at}`,
-    content: base64Content,
-    branch: GITHUB_BRANCH,
-  });
-
-  const resp = await fetch(apiUrl, {
-    method: 'PUT',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      'Accept': 'application/vnd.github.v3+json',
-    },
-    body: body,
-  });
+  // 统一通过 Cloudflare Worker 代理上传（Token 由 Worker 持有，前端不存放，全员免配置）。
+  // 若代理地址为空，则回退为带 Token 的直连（选填兜底）。
+  const message = `📞 外呼录音: ${call.lead_name} | ${call.user_name} | ${call.started_at}`;
+  let resp;
+  if (GITHUB_PROXY_URL) {
+    resp = await fetch(GITHUB_PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        path: filePath,
+        content: base64Content,
+        message: message,
+        branch: GITHUB_BRANCH,
+      }),
+    });
+  } else {
+    const token = getGHToken();
+    if (!token) throw new Error('未配置 GitHub Token（且上传代理未启用）');
+    resp = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${filePath}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/vnd.github.v3+json',
+      },
+      body: JSON.stringify({ message, content: base64Content, branch: GITHUB_BRANCH }),
+    });
+  }
 
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({}));
-    if (resp.status === 401) throw new Error('Token 无效或已过期，请重新配置');
+    if (resp.status === 401) throw new Error('上传代理 Token 未配置或无效，请联系管理员设置 Cloudflare Secret GITHUB_TOKEN');
     if (resp.status === 403) throw new Error('Token 权限不足，需要 contents:write 权限');
     if (resp.status === 409) throw new Error('文件已存在: ' + filePath);
     throw new Error(err.message || `上传失败 (HTTP ${resp.status})`);
