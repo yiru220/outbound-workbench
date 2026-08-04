@@ -440,6 +440,9 @@ const WEBHOOK_FIELDS = {
   date:     'fEDPIZ'    // 回传日期 (日期时间)
 };
 
+// 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
+const APP_VERSION = '2026-08-04c';
+
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
 
@@ -2322,6 +2325,13 @@ function toast(msg, type = 'success') {
 
 // Start
 init();
+
+// 显示版本徽标（右下角），便于确认是否加载到最新版
+(function(){
+  var bar = document.getElementById('versionBar');
+  if (bar) bar.textContent = 'v' + APP_VERSION;
+})();
 </script>
+<div id="versionBar" style="position:fixed;bottom:6px;right:10px;font-size:11px;color:#999;opacity:0.7;z-index:50;pointer-events:none;"></div>
 </body>
 </html>
