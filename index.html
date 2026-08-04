@@ -430,8 +430,7 @@ const WEBHOOK_FIELDS = {
   province: '省',
   city:     '市',
   hasStore: '是否自有门店',
-  phone:    '手机号',
-  time:     '回传日期'
+  phone:    '手机号'
 };
 
 // ========== Team ==========
@@ -1921,7 +1920,6 @@ async function syncLeadExtra() {
   values[F.city]     = ex.city || '';
   values[F.hasStore] = ex.hasStore || '';
   values[F.phone]    = phone;
-  values[F.time]     = timeStr;
   const payload = { add_records: [ { values: values } ] };
   const btn = document.getElementById('syncBtn');
   const st = document.getElementById('syncStatus');
