@@ -21,7 +21,7 @@ const GITHUB_BRANCH = 'main';
 
 // Worker 代码版本。改动代码时同步 +1，方便判断 Cloudflare 是否已部署最新版。
 // 自检：浏览器直接打开 https://outbound-webhook-proxy.yiru220.workers.dev/health
-const WORKER_VERSION = '2026-08-04m-fixsha';
+const WORKER_VERSION = '2026-08-04n-mime';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -195,9 +195,18 @@ function stripThink(s) {
   return String(s || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
 }
 
-async function asrSiliconFlow(env, bytes, filename) {
+// 按扩展名推断 MIME（部分 ASR 服务会按 MIME/扩展名做前置白名单校验）
+function mimeOf(filename) {
+  const ext = String(filename || '').toLowerCase().split('.').pop();
+  return ({
+    webm: 'audio/webm', m4a: 'audio/mp4', mp4: 'audio/mp4', mp3: 'audio/mpeg',
+    wav: 'audio/wav', ogg: 'audio/ogg', opus: 'audio/ogg', flac: 'audio/flac',
+  })[ext] || 'application/octet-stream';
+}
+
+async function sfTranscribeOnce(env, bytes, filename, mime) {
   const form = new FormData();
-  form.append('file', new Blob([bytes], { type: 'audio/webm' }), filename);
+  form.append('file', new Blob([bytes], { type: mime }), filename);
   form.append('model', 'FunAudioLLM/SenseVoiceSmall');
   const r = await fetch('https://api.siliconflow.cn/v1/audio/transcriptions', {
     method: 'POST',
@@ -205,9 +214,28 @@ async function asrSiliconFlow(env, bytes, filename) {
     body: form,
   });
   const t = await r.text();
-  if (!r.ok) throw new Error('硅基流动转写 HTTP ' + r.status + ' ' + t.slice(0, 180));
+  return { ok: r.ok, status: r.status, body: t };
+}
+
+async function asrSiliconFlow(env, bytes, filename) {
+  // 1) 先按真实格式提交
+  let res = await sfTranscribeOnce(env, bytes, filename, mimeOf(filename));
+
+  // 2) 若被拒且疑似"格式不支持"，伪装成 mp3 重试一次。
+  //    多数 ASR 后端用 ffmpeg 解码（能自动嗅探容器），格式白名单只是前置校验，
+  //    改扩展名/MIME 即可绕过，实际解码仍然正确。
+  if (!res.ok && res.status >= 400 && res.status < 500) {
+    const hint = res.body.toLowerCase();
+    if (/format|audio|decode|unsupport|invalid|type/.test(hint)) {
+      const retry = await sfTranscribeOnce(env, bytes, 'audio.mp3', 'audio/mpeg');
+      if (retry.ok) res = retry;
+      else res.body = res.body.slice(0, 160) + ' ｜ 伪装mp3重试仍失败: ' + retry.body.slice(0, 160);
+    }
+  }
+
+  if (!res.ok) throw new Error('硅基流动转写 HTTP ' + res.status + ' ' + res.body.slice(0, 300));
   let j;
-  try { j = JSON.parse(t); } catch { throw new Error('硅基流动转写返回非 JSON: ' + t.slice(0, 120)); }
+  try { j = JSON.parse(res.body); } catch { throw new Error('硅基流动转写返回非 JSON: ' + res.body.slice(0, 160)); }
   return { text: (j.text || '').trim(), model: 'FunAudioLLM/SenseVoiceSmall' };
 }
 
@@ -233,7 +261,7 @@ async function asrWorkersAI(env, bytes) {
 
 async function asrOpenAI(env, bytes, filename) {
   const form = new FormData();
-  form.append('file', new Blob([bytes], { type: 'audio/webm' }), filename);
+  form.append('file', new Blob([bytes], { type: mimeOf(filename) }), filename);
   form.append('model', 'whisper-1');
   form.append('language', 'zh');
   form.append('response_format', 'json');
