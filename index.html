@@ -441,7 +441,7 @@ const WEBHOOK_FIELDS = {
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-04d';
+const APP_VERSION = '2026-08-04e';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -2123,7 +2123,9 @@ function saveAndUpload() {
 
     // Try GitHub upload
     const token = getGHToken();
-    if (token) {
+    // 统一走 Cloudflare Worker 代理上传（Token 由 Worker 持有，前端不存放，全员免配置）。
+    // 代理地址可用即视为已配置；若没有代理但前端填了兜底 Token 也允许直连。
+    if (GITHUB_PROXY_URL || token) {
       try {
         await uploadToGitHub(call, reader.result);
       } catch(e) {
