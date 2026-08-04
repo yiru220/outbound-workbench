@@ -435,7 +435,7 @@ const WEBHOOK_FIELDS = {
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-04j';
+const APP_VERSION = '2026-08-04k';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -2111,8 +2111,17 @@ async function transcribeCall(callId) {
     }
   } catch (e) {
     if (btn) { btn.disabled = false; btn.textContent = '🎯 重新分析'; }
-    if (statusEl) statusEl.innerHTML = '<span style="color:var(--danger)">分析失败: ' + escapeHtml(e.message) + '</span>';
-    toast('分析失败: ' + e.message, 'error');
+    // 旧版 Worker 的特征报错：说明 Cloudflare 上仍是老代码，给出可执行指引而不是丢一句看不懂的错
+    const stale = /OPENAI_API_KEY 未配置/.test(e.message || '');
+    const msg = stale
+      ? 'Cloudflare 上的 Worker 还是旧版本（GitHub 仓库已更新，但线上没重新部署）。<br>'
+        + '解决：Cloudflare 控制台 → Workers &amp; Pages → <b>outbound-webhook-proxy</b> → '
+        + 'Deployments 里点 <b>Redeploy / Deploy</b>（或在 Settings 里加一个 Secret 保存，也会触发部署）。<br>'
+        + '自检地址：<a href="' + WORKER_BASE + '/health" target="_blank">' + WORKER_BASE + '/health</a>'
+        + '，能看到 version 就是新版。'
+      : '分析失败: ' + escapeHtml(e.message);
+    if (statusEl) statusEl.innerHTML = '<span style="color:var(--danger)">' + msg + '</span>';
+    toast(stale ? 'Worker 未更新，请在 Cloudflare 重新部署' : ('分析失败: ' + e.message), 'error');
   }
 }
 
