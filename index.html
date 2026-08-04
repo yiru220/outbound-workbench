@@ -1902,9 +1902,10 @@ function initExtraFields(l) {
   set('exCity', ex.city);
   set('exStore', ex.hasStore);
 }
+// 回传时间：目标表为日期类型，年月日格式 YYYY-MM-DD
 function fmtDate(d) {
   const p = n => (n < 10 ? '0' + n : '' + n);
-  return d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+  return d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate());
 }
 async function syncLeadExtra() {
   if (!selectedLead) return;
