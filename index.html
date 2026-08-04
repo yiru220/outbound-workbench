@@ -297,6 +297,8 @@
   .transcript { margin-top: 10px; font-size: 12px; }
   .transcript summary { cursor: pointer; color: var(--text-secondary); }
   .transcript-body { margin-top: 8px; white-space: pre-wrap; font-size: 13px; line-height: 1.7; color: var(--text-secondary); max-height: 320px; overflow-y: auto; background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 10px; }
+  .analysis-engine { margin-top: 10px; font-size: 11px; color: var(--text-secondary); opacity: .7; text-align: right; }
+  .analysis-warn { margin: 8px 0; padding: 8px 10px; font-size: 12px; line-height: 1.6; color: #8a6d0b; background: #fff8e1; border: 1px solid #ffe08a; border-radius: 8px; word-break: break-all; }
 
   /* History */
   .calls-table {
@@ -409,7 +411,8 @@ const WEBHOOK_PROXY_URL = 'https://outbound-webhook-proxy.yiru220.workers.dev';
 // Token 由 Worker 持有（Cloudflare Secret），前端不存放，全员免配置即可上传。
 const WORKER_BASE = 'https://outbound-webhook-proxy.yiru220.workers.dev';
 const GITHUB_PROXY_URL = WORKER_BASE + '/github';
-// 录音转写 + AI 分析代理（同一个 Worker 的 /transcribe 路由，持有 OPENAI_API_KEY）。
+// 录音转写 + AI 分析代理（同一个 Worker 的 /transcribe 路由）。
+// 后端优先级（免费优先，Worker 内自动回退）：硅基流动 → Cloudflare Workers AI → OpenAI。
 const TRANSCRIBE_PROXY_URL = WORKER_BASE + '/transcribe';
 
 // 把 GitHub blob 页链接转为 raw 直链（用于浏览器播放与 Worker 拉取音频）。
@@ -432,7 +435,7 @@ const WEBHOOK_FIELDS = {
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-04h';
+const APP_VERSION = '2026-08-04i';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -2029,18 +2032,21 @@ function renderAnalysis(a) {
   const pros = (a.strengths || []).map(s => `<li>${escapeHtml(s)}</li>`).join('');
   const cons = (a.weaknesses || []).map(s => `<li>${escapeHtml(s)}</li>`).join('');
   const transcript = a.transcript || '';
+  const engine = [a.provider_label, a.asr_model, a.llm_model].filter(Boolean).join(' · ');
   return `
     <div class="analysis-card">
       <div class="analysis-head">
         <div class="score-big" style="color:${scoreColor}">${score}<span class="score-unit">分</span></div>
         <div class="analysis-summary">${escapeHtml(a.summary || '')}</div>
       </div>
+      ${a.analysis_error ? `<div class="analysis-warn">⚠️ 已成功转写，但 AI 评分失败：${escapeHtml(a.analysis_error)}</div>` : ''}
       ${dims ? `<div class="dims">${dims}</div>` : ''}
-      <div class="proscons">
+      ${(pros || cons) ? `<div class="proscons">
         <div class="pc pros"><div class="pc-title">✅ 优点</div><ul>${pros}</ul></div>
         <div class="pc cons"><div class="pc-title">🔧 待改进</div><ul>${cons}</ul></div>
-      </div>
+      </div>` : ''}
       ${transcript ? `<details class="transcript"><summary>📝 转写全文</summary><div class="transcript-body">${escapeHtml(transcript)}</div></details>` : ''}
+      ${engine ? `<div class="analysis-engine">引擎：${escapeHtml(engine)}</div>` : ''}
     </div>`;
 }
 
@@ -2075,6 +2081,10 @@ async function transcribeCall(callId) {
       strengths: j.strengths || [],
       weaknesses: j.weaknesses || [],
       summary: j.summary || '',
+      provider_label: j.provider_label || '',
+      asr_model: j.asr_model || '',
+      llm_model: j.llm_model || '',
+      analysis_error: j.analysis_error || '',
       analyzed_at: new Date().toISOString(),
     };
     updateCallInStorage(call);
@@ -2090,7 +2100,11 @@ async function transcribeCall(callId) {
     }
     if (btn) { btn.disabled = false; btn.textContent = '🔄 重新分析'; }
     if (currentTab === 'history') renderMain();
-    toast('分析完成 · 综合 ' + (call.analysis.score != null ? call.analysis.score + '分' : '—'), 'success');
+    if (call.analysis.analysis_error) {
+      toast('已转写，但 AI 评分失败（详见卡片提示）', 'error');
+    } else {
+      toast('分析完成 · 综合 ' + (call.analysis.score != null ? call.analysis.score + '分' : '—'), 'success');
+    }
   } catch (e) {
     if (btn) { btn.disabled = false; btn.textContent = '🎯 重新分析'; }
     if (statusEl) statusEl.innerHTML = '<span style="color:var(--danger)">分析失败: ' + escapeHtml(e.message) + '</span>';
