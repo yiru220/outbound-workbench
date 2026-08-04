@@ -74,42 +74,6 @@
   .login-card button:hover { opacity: 0.9; }
   .login-card button:disabled { opacity: 0.5; cursor: not-allowed; }
 
-  /* Settings toggle on login */
-  .settings-toggle {
-    display: inline-flex; align-items: center; gap: 4px;
-    font-size: 12px; color: var(--text-muted); cursor: pointer;
-    margin-top: 16px; user-select: none;
-  }
-  .settings-toggle:hover { color: var(--primary); }
-  .settings-panel {
-    display: none; text-align: left;
-    background: var(--bg); border-radius: var(--radius);
-    padding: 16px; margin-top: 12px;
-  }
-  .settings-panel.active { display: block; }
-  .settings-panel label {
-    display: block; font-size: 12px; font-weight: 500;
-    color: var(--text-secondary); margin-bottom: 6px;
-  }
-  .settings-panel input {
-    width: 100%; padding: 8px 12px;
-    border: 1px solid var(--border); border-radius: 6px;
-    font-size: 13px; font-family: "SF Mono", monospace;
-    background: var(--card);
-  }
-  .settings-panel .help-text {
-    font-size: 11px; color: var(--text-muted); margin-top: 6px;
-    line-height: 1.5;
-  }
-  .settings-panel .help-text a { color: var(--primary); }
-  .settings-panel .status-indicator {
-    display: flex; align-items: center; gap: 6px;
-    font-size: 12px; margin-top: 8px;
-  }
-  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-  .dot.green { background: var(--primary); }
-  .dot.gray { background: #ccc; }
-
   /* Banner */
   .offline-banner {
     background: #f0f7f4; color: var(--primary);
@@ -348,33 +312,6 @@
       <option value="">选择你的名字</option>
     </select>
     <button id="loginBtn" disabled>进入工作台</button>
-
-    <!-- GitHub Settings -->
-    <div class="settings-toggle" onclick="toggleSettings()">
-      ⚙️ 上传设置
-      <span id="settingsStatus"></span>
-    </div>
-    <div class="settings-panel" id="settingsPanel">
-      <label>GitHub Personal Access Token（选填）</label>
-      <input type="password" id="ghToken" placeholder="github_pat_...（一般无需填写）">
-      <div class="help-text">
-        <b>录音已统一通过上传代理自动上传，全员无需填写 Token。</b><br>
-        此字段仅在「关闭上传代理」时作为直连兜底用：需具有 <code>contents:write</code> 权限的 token。<br>
-        <a href="https://github.com/settings/tokens?type=beta" target="_blank">点此创建 Fine-grained token →</a><br>
-        仓库选 <code>yiru220/outbound-workbench</code>，权限选 <b>Contents: Read and write</b>
-      </div>
-      <div class="status-indicator" id="ghStatus">
-        <span class="dot gray"></span> 未配置
-      </div>
-      <hr style="margin:14px 0;border:none;border-top:1px solid var(--border);">
-      <label>回传代理地址（解决跨域）</label>
-      <input type="text" id="proxyUrl" placeholder="https://xxxx.workers.dev">
-      <div class="help-text">
-        企业微信接口禁止浏览器直连，需一个代理转发回传请求。<br>
-        部署方法见仓库 <code>proxy/README.md</code>（Cloudflare Worker，免费）。<br>
-        部署后把 Worker 地址填这里即可，无需改代码。
-      </div>
-    </div>
   </div>
 </div>
 
@@ -422,8 +359,7 @@ const RECORDINGS_PATH = 'recordings';
 
 // ========== Webhook：回传客户补充信息到企微智能表格 ==========
 const WEBHOOK_URL = 'https://qyapi.weixin.qq.com/cgi-bin/wedoc/smartsheet/webhook?key=13q3vpbak4k1uyFxoToaopH15jRjtaPaQ3LH74X7z3KRp7nLRZlCUVGk1T8OJc6AWGfXV3uIfbqfMb3t1ExEov1MaCgqwFX2dQHTShxleZ2r';
-// 回传代理地址（Cloudflare Worker，用于绕过浏览器跨域）。为空时回退直连（会跨域失败）。
-// 部署 Worker 后把地址填进「⚙️上传设置→回传代理地址」，或由管理员直接填这里并重新部署，全员立即生效。
+// 回传代理地址（Cloudflare Worker，用于绕过浏览器跨域）。已内置并部署，全员免配置立即生效。
 const WEBHOOK_PROXY_URL = 'https://outbound-webhook-proxy.yiru220.workers.dev';
 
 // GitHub 上传统一走 Cloudflare Worker 代理（同一个 Worker 的 /github 路由）。
@@ -441,7 +377,7 @@ const WEBHOOK_FIELDS = {
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-04e';
+const APP_VERSION = '2026-08-04f';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -1698,36 +1634,6 @@ function init() {
     }).catch(() => { buildUserDropdown(); });
   } catch(e) { buildUserDropdown(); }
   document.getElementById('searchInput').oninput = renderLeads;
-
-  // Restore GitHub token（上传统一走 Worker 代理，此字段仅为关闭代理时的直连兜底，可选）
-  const savedToken = getGHToken();
-  if (savedToken) {
-    document.getElementById('ghToken').value = savedToken;
-    updateGHStatus(true);
-  }
-  document.getElementById('ghToken').oninput = function() {
-    setGHToken(this.value);
-    updateGHStatus(!!this.value.trim());
-  };
-
-  // Restore 回传代理地址
-  const savedProxy = getProxyUrl() || WEBHOOK_PROXY_URL;
-  if (savedProxy) document.getElementById('proxyUrl').value = savedProxy;
-  document.getElementById('proxyUrl').oninput = function() {
-    setProxyUrl(this.value.trim());
-  };
-}
-
-function toggleSettings() {
-  document.getElementById('settingsPanel').classList.toggle('active');
-}
-
-function updateGHStatus(configured) {
-  const el = document.getElementById('ghStatus');
-  const dot = configured ? 'green' : 'gray';
-  const text = configured ? '已配置 (录音将自动上传)' : '未配置 (录音仅存本地)';
-  el.innerHTML = `<span class="dot ${dot}"></span> ${text}`;
-  document.getElementById('settingsStatus').textContent = configured ? ' ✓' : '';
 }
 
 function login() {
@@ -1823,7 +1729,6 @@ function renderMain() {
     }
 
     const l = selectedLead;
-    const hasGH = !!(GITHUB_PROXY_URL || getGHToken());
     container.innerHTML = `
       <div class="call-panel">
         <div class="lead-info">
@@ -1872,7 +1777,6 @@ function renderMain() {
         <button class="record-btn" id="recordBtn" onclick="toggleRecording()">开始录音</button>
         <div id="uploadArea"></div>
         <div class="hint" id="recordHint">点击后开始录音，用手机拨打客户，开启外放</div>
-        ${hasGH ? '' : '<div class="hint" style="color:var(--warning);margin-top:4px;">⚠️ 未配置GitHub Token，录音仅保存在本地。点登录页「⚙️ 上传设置」配置</div>'}
       </div>`;
       initExtraFields(l);
   } else {
@@ -1961,7 +1865,7 @@ async function syncLeadExtra() {
   } catch(e) {
     st.style.color = 'red';
     const viaProxy = !!(getProxyUrl() || WEBHOOK_PROXY_URL);
-    st.textContent = '❌ ' + (viaProxy ? ('代理请求失败: ' + e.message) : ('跨域错误: ' + e.message + '（请在「⚙️上传设置」填写回传代理地址）'));
+    st.textContent = '❌ ' + (viaProxy ? ('代理请求失败: ' + e.message) : ('跨域错误: ' + e.message + '（请联系管理员确认上传代理是否已配置）'));
   } finally {
     btn.disabled = false;
   }
