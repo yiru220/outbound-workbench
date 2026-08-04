@@ -130,19 +130,160 @@ async function handleGitHub(request, env) {
   }
 }
 
-// ---------- 录音转写 + AI 分析（新增） ----------
+// ---------- 录音转写 + AI 分析 ----------
 // 接收 { url }（raw.githubusercontent 音频直链）或 { audio }（base64 dataURL，本地未上传的录音）
-// 流程：OpenAI whisper-1 转写 -> gpt-4o-mini 评分/优缺点分析 -> 返回 JSON
-async function handleTranscribe(request, env) {
-  const key = env.OPENAI_API_KEY;
-  if (!key) {
-    return json({ error: 'OPENAI_API_KEY 未配置：请在 Cloudflare Worker 的 Secrets 中增加该密钥' }, 500);
-  }
+// 后端优先级（免费优先，自动回退）：
+//   1) siliconflow —— SenseVoiceSmall(ASR 免费不限量) + Qwen3-8B(LLM 免费)，中文效果最好，需 SILICONFLOW_API_KEY
+//   2) workersai   —— @cf/openai/whisper-large-v3-turbo + @cf/qwen/qwen3-30b-a3b-fp8，零密钥，
+//                     Cloudflare 每天赠送 10000 neurons ≈ 240 分钟音频
+//   3) openai      —— whisper-1 + gpt-4o-mini，付费兜底，需 OPENAI_API_KEY
+const PROVIDER_LABEL = {
+  siliconflow: '硅基流动（免费）',
+  workersai: 'Cloudflare Workers AI（免费额度）',
+  openai: 'OpenAI（付费）',
+};
 
+function providerAvailability(env) {
+  return {
+    siliconflow: !!env.SILICONFLOW_API_KEY,
+    workersai: !!env.AI,
+    openai: !!env.OPENAI_API_KEY,
+  };
+}
+
+// 返回按优先级排序的可用后端列表；want 指定时置于首位
+function providerChain(env, want) {
+  const has = providerAvailability(env);
+  const order = ['siliconflow', 'workersai', 'openai'].filter(p => has[p]);
+  if (want && has[want]) return [want, ...order.filter(p => p !== want)];
+  return order;
+}
+
+function bytesToBase64(bytes) {
+  let bin = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+  }
+  return btoa(bin);
+}
+
+// 去掉推理模型可能输出的 <think>...</think> 段
+function stripThink(s) {
+  return String(s || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+}
+
+async function asrSiliconFlow(env, bytes, filename) {
+  const form = new FormData();
+  form.append('file', new Blob([bytes], { type: 'audio/webm' }), filename);
+  form.append('model', 'FunAudioLLM/SenseVoiceSmall');
+  const r = await fetch('https://api.siliconflow.cn/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + env.SILICONFLOW_API_KEY },
+    body: form,
+  });
+  const t = await r.text();
+  if (!r.ok) throw new Error('硅基流动转写 HTTP ' + r.status + ' ' + t.slice(0, 180));
+  let j;
+  try { j = JSON.parse(t); } catch { throw new Error('硅基流动转写返回非 JSON: ' + t.slice(0, 120)); }
+  return { text: (j.text || '').trim(), model: 'FunAudioLLM/SenseVoiceSmall' };
+}
+
+async function asrWorkersAI(env, bytes) {
+  // 先试 turbo（中文更准，base64 入参），失败再退基础 whisper（字节数组入参）
+  let firstErr = '';
+  try {
+    const r = await env.AI.run('@cf/openai/whisper-large-v3-turbo', {
+      audio: bytesToBase64(bytes),
+      language: 'zh',
+    });
+    const text = String(r?.text || r?.transcription || '').trim();
+    if (text) return { text, model: '@cf/openai/whisper-large-v3-turbo' };
+    firstErr = 'turbo 返回空文本';
+  } catch (e) { firstErr = e.message; }
+  try {
+    const r2 = await env.AI.run('@cf/openai/whisper', { audio: Array.from(bytes) });
+    return { text: String(r2?.text || '').trim(), model: '@cf/openai/whisper' };
+  } catch (e) {
+    throw new Error('Workers AI 转写失败: ' + e.message + (firstErr ? '（turbo: ' + firstErr + '）' : ''));
+  }
+}
+
+async function asrOpenAI(env, bytes, filename) {
+  const form = new FormData();
+  form.append('file', new Blob([bytes], { type: 'audio/webm' }), filename);
+  form.append('model', 'whisper-1');
+  form.append('language', 'zh');
+  form.append('response_format', 'json');
+  const r = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + env.OPENAI_API_KEY },
+    body: form,
+  });
+  const j = await r.json();
+  if (!r.ok) throw new Error('OpenAI 转写: ' + (j.error?.message || r.status));
+  return { text: (j.text || '').trim(), model: 'whisper-1' };
+}
+
+async function runASR(env, provider, bytes, filename) {
+  if (provider === 'siliconflow') return asrSiliconFlow(env, bytes, filename);
+  if (provider === 'workersai') return asrWorkersAI(env, bytes);
+  return asrOpenAI(env, bytes, filename);
+}
+
+async function runChat(env, provider, sys, user) {
+  if (provider === 'siliconflow') {
+    const r = await fetch('https://api.siliconflow.cn/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + env.SILICONFLOW_API_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'Qwen/Qwen3-8B',
+        messages: [{ role: 'system', content: sys }, { role: 'user', content: user }],
+        temperature: 0.3,
+        max_tokens: 1400,
+        enable_thinking: false,
+      }),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error('硅基流动分析: ' + (j.message || j.error?.message || r.status));
+    return { raw: j.choices?.[0]?.message?.content || '', model: 'Qwen/Qwen3-8B' };
+  }
+  if (provider === 'workersai') {
+    const r = await env.AI.run('@cf/qwen/qwen3-30b-a3b-fp8', {
+      messages: [{ role: 'system', content: sys }, { role: 'user', content: user }],
+      max_tokens: 1400,
+      temperature: 0.3,
+    });
+    return { raw: r?.response || '', model: '@cf/qwen/qwen3-30b-a3b-fp8' };
+  }
+  const r = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + env.OPENAI_API_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'system', content: sys }, { role: 'user', content: user }],
+      temperature: 0.3,
+      response_format: { type: 'json_object' },
+    }),
+  });
+  const j = await r.json();
+  if (!r.ok) throw new Error('OpenAI 分析: ' + (j.error?.message || r.status));
+  return { raw: j.choices?.[0]?.message?.content || '', model: 'gpt-4o-mini' };
+}
+
+async function handleTranscribe(request, env) {
   let payload;
   try { payload = await request.json(); } catch { return json({ error: 'Invalid JSON' }, 400); }
-  const { url, audio, name } = payload;
+  const { url, audio, name, provider: want } = payload;
   if (!url && !audio) return json({ error: 'url 或 audio 至少提供一个' }, 400);
+
+  const chain = providerChain(env, want);
+  if (!chain.length) {
+    return json({
+      error: '没有可用的转写后端。三选一即可：①（推荐，免费）在 Worker 加 Secret SILICONFLOW_API_KEY；'
+        + '②在 wrangler.toml 绑定 Workers AI（[ai] binding = "AI"）用每日免费额度；③加 OPENAI_API_KEY 走付费。',
+    }, 500);
+  }
 
   // 1) 拿到音频字节
   let audioBytes;
@@ -160,26 +301,31 @@ async function handleTranscribe(request, env) {
     } catch (e) { return json({ error: 'audio 解码失败: ' + e.message }, 400); }
   }
 
-  // 2) OpenAI 转写
-  let transcript;
-  try {
-    const form = new FormData();
-    form.append('file', new Blob([audioBytes], { type: 'audio/webm' }), filename);
-    form.append('model', 'whisper-1');
-    form.append('language', 'zh');
-    form.append('response_format', 'json');
-    const tr = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + key },
-      body: form,
-    });
-    const tj = await tr.json();
-    if (!tr.ok) return json({ error: '转写失败: ' + (tj.error?.message || tr.status) }, 502);
-    transcript = (tj.text || '').trim();
-  } catch (e) { return json({ error: '转写请求异常: ' + e.message }, 502); }
+  // 2) 转写：沿回退链依次尝试，任一成功即用
+  let transcript = '';
+  let usedProvider = '';
+  let asrModel = '';
+  const errors = [];
+  for (const p of chain) {
+    try {
+      const res = await runASR(env, p, audioBytes, filename);
+      usedProvider = p;
+      asrModel = res.model;
+      transcript = res.text;
+      break;
+    } catch (e) {
+      errors.push(PROVIDER_LABEL[p] + ' → ' + e.message);
+    }
+  }
+  if (!usedProvider) {
+    return json({ error: '转写失败（已尝试全部后端）：\n' + errors.join('\n') }, 502);
+  }
+
+  const meta = { provider: usedProvider, provider_label: PROVIDER_LABEL[usedProvider], asr_model: asrModel };
 
   if (!transcript) {
     return json({
+      ...meta,
       transcript: '',
       score: 0,
       dimensions: [],
@@ -199,31 +345,29 @@ async function handleTranscribe(request, env) {
 - summary：一句话总体点评（中文）。
 只输出严格 JSON，不要代码块、不要解释文字。格式：
 {"score":85,"dimensions":[{"name":"开场破冰","score":8},{"name":"需求挖掘","score":9},{"name":"异议处理","score":7},{"name":"成交引导","score":8},{"name":"专业度","score":9}],"strengths":["..."],"weaknesses":["..."],"summary":"..."}`;
-  try {
-    const cr = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: sys },
-          { role: 'user', content: '以下是外呼录音转写文本：\n\n' + transcript },
-        ],
-        temperature: 0.3,
-        response_format: { type: 'json_object' },
-      }),
-    });
-    const cj = await cr.json();
-    if (!cr.ok) return json({ error: '分析失败: ' + (cj.error?.message || cr.status) }, 502);
-    const raw = cj.choices?.[0]?.message?.content || '{}';
-    let analysis;
-    try { analysis = JSON.parse(extractJson(raw)); }
-    catch (e) { return json({ transcript, score: null, dimensions: [], strengths: [], weaknesses: [], summary: '', analysis_error: '分析解析失败: ' + e.message }); }
-    return json({ transcript, ...analysis });
-  } catch (e) {
-    // 转写成功但分析失败：仍返回转写结果
-    return json({ transcript, score: null, dimensions: [], strengths: [], weaknesses: [], summary: '', analysis_error: e.message });
+  const userMsg = '以下是外呼录音转写文本：\n\n' + transcript;
+  const chatErrors = [];
+  // 分析同样走回退链：优先与转写相同的后端，失败再换
+  for (const p of providerChain(env, usedProvider)) {
+    try {
+      const { raw, model } = await runChat(env, p, sys, userMsg);
+      const analysis = JSON.parse(extractJson(stripThink(raw)));
+      return json({ ...meta, llm_provider: p, llm_model: model, transcript, ...analysis });
+    } catch (e) {
+      chatErrors.push(PROVIDER_LABEL[p] + ' → ' + e.message);
+    }
   }
+  // 转写成功但分析全部失败：仍返回转写结果，不让用户白跑
+  return json({
+    ...meta,
+    transcript,
+    score: null,
+    dimensions: [],
+    strengths: [],
+    weaknesses: [],
+    summary: '',
+    analysis_error: chatErrors.join('; '),
+  });
 }
 
 function extractJson(s) {
