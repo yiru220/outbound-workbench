@@ -19,9 +19,13 @@ const WEBHOOK_TARGET =
 const GITHUB_REPO = 'yiru220/outbound-workbench';
 const GITHUB_BRANCH = 'main';
 
+// Worker 代码版本。改动代码时同步 +1，方便判断 Cloudflare 是否已部署最新版。
+// 自检：浏览器直接打开 https://outbound-webhook-proxy.yiru220.workers.dev/health
+const WORKER_VERSION = '2026-08-04j-multibackend';
+
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
@@ -31,6 +35,22 @@ export default {
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: CORS });
     }
+
+    // 健康检查（GET 即可）：返回当前 Worker 版本与各转写后端是否就绪。
+    // 若返回 404 或没有 version 字段，说明 Cloudflare 上仍是旧版代码，需要重新部署。
+    if (url.pathname === '/health') {
+      return json({
+        ok: true,
+        version: WORKER_VERSION,
+        backends: {
+          siliconflow: !!env.SILICONFLOW_API_KEY,
+          workersai: !!env.AI,
+          openai: !!env.OPENAI_API_KEY,
+        },
+        github_token: !!env.GITHUB_TOKEN,
+      });
+    }
+
     if (request.method !== 'POST') {
       return new Response('Method Not Allowed', { status: 405, headers: CORS });
     }
