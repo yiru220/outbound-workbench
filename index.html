@@ -589,7 +589,7 @@ const WEBHOOK_FIELDS = {
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-05d';
+const APP_VERSION = '2026-08-05e';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -2392,6 +2392,7 @@ function renderRecordingItem(c) {
     <div class="rec-actions">
       <button class="btn btn-sm btn-secondary" id="txbtn-${c.call_id}" onclick="transcribeCall('${c.call_id}')" ${hasAudio ? '' : 'disabled title="无可分析音频"'}>🎯 转写分析</button>
       ${analyzed && c.analysis.score != null ? `<span class="score-pill" title="综合得分">${c.analysis.score}分</span>` : ''}
+      <button class="btn btn-sm btn-danger" onclick="deleteCall('${c.call_id}')" title="删除本地与服务器录音">🗑️ 删除</button>
     </div>
     <div class="rec-status" id="txstatus-${c.call_id}">${analyzed ? '' : '点击上方按钮，自动转文字 + 打分 + 优缺点分析'}</div>
     <div class="rec-analysis" id="analysis-${c.call_id}">${analyzed ? renderAnalysis(c.analysis) : ''}</div>
@@ -2846,13 +2847,63 @@ function downloadAudio(callId) {
   a.click();
 }
 
-function deleteCall(callId) {
-  if (!confirm('确定删除这条通话记录？录音文件无法从 GitHub 自动删除')) return;
+async function deleteCall(callId) {
+  const call = calls.find(c => c.call_id === callId);
+  if (!call) return;
+  if (!confirm('确定删除这条录音？将从本地与服务器（GitHub 仓库）一并删除，不可恢复。')) return;
+
+  // 1) 本地删除
   calls = calls.filter(c => c.call_id !== callId);
-  localStorage.setItem('outbound_calls', JSON.stringify(calls));
+  try { localStorage.setItem('outbound_calls', JSON.stringify(calls)); } catch (e) {}
   updateStats();
+
+  // 2) 服务器删除（录音 + 分析 JSON 兄弟文件）；任一处失败仅提示，不影响本地删除
+  let serverOk = true, serverMsg = '';
+  if (call.github_path) {
+    const paths = [call.github_path, call.github_path.replace(/\.webm$/i, '.analysis.json')];
+    for (const p of paths) {
+      try { await deleteGitHubFile(p); }
+      catch (e) { serverOk = false; serverMsg = e.message; }
+    }
+  }
+
   renderMain();
-  toast('已删除');
+  if (serverOk) toast('已删除（本地 + 服务器）', 'success');
+  else toast('本地已删除；服务器删除失败：' + (serverMsg || '未知错误') + '（可能 Worker 未更新或文件已不存在）', 'error');
+}
+
+// 通过 Worker 代理（或前端 token 兜底）删除 GitHub 仓库中的文件；404 视为已删除
+async function deleteGitHubFile(path) {
+  const message = '🗑️ 删除录音: ' + path;
+  const target = getProxyUrl() || GITHUB_PROXY_URL;
+  if (target) {
+    const resp = await fetch(target, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'delete', path, message, branch: GITHUB_BRANCH }),
+    });
+    if (resp.status === 404) return;
+    if (!resp.ok) {
+      const j = await resp.json().catch(() => ({}));
+      throw new Error(j.error || ('HTTP ' + resp.status));
+    }
+    return;
+  }
+  const token = getGHToken();
+  if (!token) throw new Error('未配置上传代理或 GitHub Token');
+  const apiUrl = `https://api.github.com/repos/${GITHUB_REPO}/contents/${path}`;
+  const h = { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.v3+json' };
+  const g = await fetch(apiUrl, { headers: h });
+  if (g.status === 404) return;
+  if (!g.ok) throw new Error('获取文件失败 HTTP ' + g.status);
+  const gj = await g.json();
+  const d = await fetch(apiUrl, {
+    method: 'DELETE',
+    headers: { ...h, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, branch: GITHUB_BRANCH, sha: gj.sha }),
+  });
+  if (d.status === 404) return;
+  if (!d.ok) throw new Error('删除失败 HTTP ' + d.status);
 }
 
 function formatDuration(sec) {
