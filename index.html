@@ -11,6 +11,7 @@
     --card: #ffffff;
     --primary: #1a7f5a;
     --primary-light: #e8f5ef;
+    --primary-dark: #14624a;
     --danger: #e24b4b;
     --warning: #d85a30;
     --text: #1a1a1a;
@@ -182,8 +183,8 @@
     font-size: 48px; margin-bottom: 16px; opacity: 0.3;
   }
   .call-panel .lead-info {
-    background: var(--bg); border-radius: var(--radius);
-    padding: 16px 20px; margin-bottom: 24px; text-align: left;
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 18px 20px; margin-bottom: 16px; text-align: left; box-shadow: var(--shadow);
   }
   .call-panel .lead-info .label {
     font-size: 12px; color: var(--text-muted); margin-bottom: 4px;
@@ -201,7 +202,7 @@
     gap: 20px; align-items: start;
     max-width: 1140px; margin: 0 auto; text-align: left;
   }
-  .work-col { min-width: 0; text-align: center; }
+  .work-col { min-width: 0; text-align: left; }
   .work-col .call-panel { max-width: none; }
   .script-col { min-width: 0; position: sticky; top: 0; }
   @media (max-width: 1180px) {
@@ -337,14 +338,24 @@
     color: #fff; animation: pulse 1.5s infinite;
   }
   .record-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-  /* 已触达标记按钮 */
-  .reached-btn {
-    width: 100%; margin: 14px 0 4px; padding: 11px;
-    border-radius: 10px; border: 1px solid var(--border); background: var(--card);
-    color: var(--text); font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.15s;
+  /* 操作区卡片：已触达 + 录音 归整到一个区块，整页更合理 */
+  .action-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 16px 20px; margin-bottom: 16px; box-shadow: var(--shadow); text-align: center;
   }
-  .reached-btn:hover { border-color: var(--primary); }
-  .reached-btn.on { background: #2f855a; border-color: #2f855a; color: #fff; }
+  .record-zone { margin-top: 2px; }
+  /* 已触达标记按钮：未点击=实心绿（醒目 CTA），已点击=浅绿（已完成） */
+  .reached-btn {
+    width: 100%; margin: 0 0 14px; padding: 13px 16px;
+    border-radius: 10px; border: 1.5px solid var(--primary);
+    background: var(--primary); color: #fff;
+    font-size: 14px; font-weight: 600; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    transition: background .15s, border-color .15s, color .15s;
+  }
+  .reached-btn:hover { background: var(--primary-dark); border-color: var(--primary-dark); }
+  .reached-btn.on { background: var(--primary-light); border-color: #b8e0cd; color: var(--primary); }
+  .reached-btn.on:hover { background: #dcefe7; }
   @keyframes pulse {
     0%, 100% { box-shadow: 0 0 0 0 rgba(226, 75, 75, 0.4); }
     50% { box-shadow: 0 0 0 16px rgba(226, 75, 75, 0); }
@@ -359,8 +370,8 @@
   }
   .call-panel .hint.recording-hint { color: var(--danger); }
   .call-panel .extra-info {
-    margin: 18px 0 4px; padding: 14px; border: 1px solid var(--border);
-    border-radius: var(--radius); background: var(--bg); text-align: left;
+    margin: 16px 0 4px; padding: 18px 20px; border: 1px solid var(--border);
+    border-radius: var(--radius); background: var(--card); text-align: left; box-shadow: var(--shadow);
   }
   .call-panel .extra-title {
     font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 10px;
@@ -378,9 +389,10 @@
     box-sizing: border-box;
   }
   .call-panel .sync-btn {
-    width: 100%; margin-top: 12px; padding: 10px; font-size: 14px; font-weight: 600;
-    color: #fff; background: #2b6cb0; border: none; border-radius: 10px; cursor: pointer;
+    width: 100%; margin-top: 12px; padding: 11px; font-size: 14px; font-weight: 600;
+    color: #fff; background: var(--primary); border: none; border-radius: 10px; cursor: pointer;
   }
+  .call-panel .sync-btn:hover { background: var(--primary-dark); }
   .call-panel .sync-btn:disabled { opacity: .6; cursor: default; }
   .call-panel .sync-status { margin-top: 8px; font-size: 12px; min-height: 16px; }
   .call-panel .synced-note {
@@ -465,8 +477,8 @@
   .btn-primary { background: var(--primary); color: #fff; }
   .btn-sm { padding: 4px 10px; font-size: 12px; }
   .btn-ghost { background: transparent; color: var(--text-secondary); border: 1px solid var(--border); }
-  .btn-secondary { background: #e7f5ff; color: #1971c2; border: 1px solid #a5d8ff; }
-  .btn-secondary:hover { background: #d0ebff; }
+  .btn-secondary { background: var(--primary-light); color: var(--primary); border: 1px solid #b8e0cd; }
+  .btn-secondary:hover { background: #dcefe7; }
   .btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
   .btn-danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
 
@@ -497,7 +509,7 @@
   <div class="login-card">
     <h1>🌿 康小虎 · 外呼工作台</h1>
     <p class="subtitle">线索电话跟进 · 录音自动上传 · AI智能分析</p>
-    <p id="syncedHint" style="font-size:12px;color:#2b6cb0;margin-top:2px;">📡 正在加载线索列表…</p>
+    <p id="syncedHint" style="font-size:12px;color:#1a7f5a;margin-top:2px;">📡 正在加载线索列表…</p>
     <select id="userSelect">
       <option value="">选择你的名字</option>
     </select>
@@ -577,7 +589,7 @@ const WEBHOOK_FIELDS = {
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-05c';
+const APP_VERSION = '2026-08-05d';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -1796,14 +1808,14 @@ function ownerIdForName(name) {
 function ownerChip(l) {
   const name = l.owner_name || ownerNameOf(l.owner_id) || '';
   if (!name) return '';
-  return `<div style="font-size:11px;color:#2b6cb0;margin-top:4px;">对接人: ${name}</div>`;
+  return `<div style="font-size:11px;color:#1a7f5a;margin-top:4px;">对接人: ${name}</div>`;
 }
 // Detail block for the call panel
 function ownerChipDetail(l) {
   const id = l.owner_id || '';
   const name = ownerNameOf(id) || l.owner_name || '';
   if (!name && !id) return '';
-  const color = name ? '#2b6cb0' : '#aaa';
+  const color = name ? '#1a7f5a' : '#aaa';
   const label = name || id;
   return `<div style="margin-top:12px;"><div class="label">负责人</div><div class="value" style="font-size:13px;color:${color};">${label}</div></div>`;
 }
@@ -2155,11 +2167,15 @@ function renderMain() {
           </div>
           ${l.feedback ? `<div style="margin-top:12px;"><div class="label">之前反馈</div><div style="font-size:13px;color:#666;">${l.feedback}</div></div>` : ''}
         </div>
-        <button class="reached-btn ${leadReached[l.record_id] ? 'on' : ''}" id="reachedBtn" onclick="toggleReached()">${leadReached[l.record_id] ? '✅ 已触达（点击取消）' : '📞 标记为已触达'}</button>
-        <div id="timerDisplay" class="timer" style="display:none;">00:00</div>
-        <button class="record-btn" id="recordBtn" onclick="toggleRecording()">开始录音</button>
-        <div id="uploadArea"></div>
-        <div class="hint" id="recordHint">点击后开始录音，用手机拨打客户，开启外放</div>
+        <div class="action-card">
+          <button class="reached-btn ${leadReached[l.record_id] ? 'on' : ''}" id="reachedBtn" onclick="toggleReached()">${leadReached[l.record_id] ? '✅ 已触达（点击取消）' : '📞 标记为已触达'}</button>
+          <div class="record-zone">
+            <div id="timerDisplay" class="timer" style="display:none;">00:00</div>
+            <button class="record-btn" id="recordBtn" onclick="toggleRecording()">开始录音</button>
+            <div id="uploadArea"></div>
+            <div class="hint" id="recordHint">点击后开始录音，用手机拨打客户，开启外放</div>
+          </div>
+        </div>
         <div class="extra-info">
             <div class="extra-title">📇 客户补充信息（填完点回传）</div>
             ${synced ? `<div class="synced-note">✅ 该客户已于 <b>${synced}</b> 回传，无需重复回传</div>` : ''}
