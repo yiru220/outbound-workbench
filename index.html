@@ -593,7 +593,7 @@ const WEBHOOK_FIELDS = {
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-05g';
+const APP_VERSION = '2026-08-05h';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -2229,7 +2229,7 @@ function renderMain() {
             <button class="sync-btn" id="syncBtn" ${synced ? 'disabled' : ''} onclick="syncLeadExtra()">${synced ? '✅ 已回传' : '🚀 回传客户信息'}</button>
             <div class="sync-status" id="syncStatus">${synced ? '该客户已回传，按钮已禁用' : ''}</div>
         </div>
-        ${renderLeadRecordings(l)}
+        <div id="recordingsBlock">${renderLeadRecordings(l)}</div>
       </div>
       </div>
       <div class="script-col" id="scriptCol">${renderScriptPanel(l)}</div>
@@ -2404,6 +2404,20 @@ function renderLeadRecordings(l) {
     <div class="recordings-title">📼 该客户的通话录音（${list.length}）</div>
     ${list.map(c => renderRecordingItem(c)).join('')}
   </div>`;
+}
+
+// 仅刷新「该客户的通话录音」区块（不动话术面板，保留滚动位置）
+function refreshRecordingsBlock() {
+  if (!selectedLead) return;
+  const box = document.getElementById('recordingsBlock');
+  if (!box) return;
+  box.innerHTML = renderLeadRecordings(selectedLead);
+}
+
+// 录音列表变化后的统一刷新：call 页只刷新录音区块；history 页整体重渲染
+function refreshAfterCallChange() {
+  if (currentTab === 'call') refreshRecordingsBlock();
+  else renderMain();
 }
 
 function renderRecordingItem(c) {
@@ -2694,6 +2708,7 @@ function saveAndUpload() {
     }
 
     updateStats();
+    refreshRecordingsBlock();  // 录音刚保存即显示在「该客户的通话录音」区块
 
     // Try GitHub upload
     const token = getGHToken();
@@ -2708,6 +2723,7 @@ function saveAndUpload() {
         updateCallInStorage(call);
         updateUploadUI('error', e.message);
         toast('上传失败: ' + e.message, 'error');
+        refreshAfterCallChange();
       }
     } else {
       updateUploadUI('local', 'GitHub Token 未配置，录音仅保存在本地');
@@ -2819,8 +2835,7 @@ async function uploadToGitHub(call, dataUrl) {
   updateUploadUI('success', `已上传 → ${filePath}`);
   toast(`✅ 录音已自动上传到 GitHub`, 'success');
 
-  // Update history tab if visible
-  if (currentTab === 'history') renderMain();
+  refreshAfterCallChange();  // 切换音频源为 GitHub 链接 / 或刷新历史页
 }
 
 function updateCallInStorage(call) {
@@ -2896,7 +2911,7 @@ async function deleteCall(callId) {
     }
   }
 
-  renderMain();
+  refreshAfterCallChange();
   if (serverOk) toast('已删除（本地 + 服务器）', 'success');
   else toast('本地已删除；服务器删除失败：' + (serverMsg || '未知错误') + '（可能 Worker 未更新或文件已不存在）', 'error');
 }
