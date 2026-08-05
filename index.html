@@ -480,7 +480,7 @@
   <div class="login-card">
     <h1>🌿 康小虎 · 外呼工作台</h1>
     <p class="subtitle">线索电话跟进 · 录音自动上传 · AI智能分析</p>
-    <p style="font-size:12px;color:#2b6cb0;margin-top:2px;">📡 已同步真实线索 55 条（来自智能表格 9-线索情况）</p>
+    <p id="syncedHint" style="font-size:12px;color:#2b6cb0;margin-top:2px;">📡 正在加载线索列表…</p>
     <select id="userSelect">
       <option value="">选择你的名字</option>
     </select>
@@ -563,7 +563,7 @@ const WEBHOOK_FIELDS = {
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-04o';
+const APP_VERSION = '2026-08-05a';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -1831,10 +1831,38 @@ function login() {
   document.getElementById('loginScreen').classList.remove('active');
   document.getElementById('app').classList.add('active');
   document.getElementById('currentUser').textContent = currentUser;
-  leads = [...REAL_LEADS];
-  updateStats();
-  renderLeads();
-  renderMain();
+  loadLeads().then(data => {
+    leads = data;
+    updateStats();
+    renderLeads();
+    renderMain();
+  });
+}
+
+// 客户列表加载：优先每日同步的 leads.json，失败回退内置快照 REAL_LEADS。
+// 多源兜底：先同域 ./leads.json（GitHub Pages），再 raw 直链，最后内置快照。
+async function loadLeads() {
+  const ts = '_=' + Date.now();
+  const sources = [
+    './leads.json?' + ts,
+    'https://raw.githubusercontent.com/yiru220/outbound-workbench/main/leads.json?' + ts
+  ];
+  for (const url of sources) {
+    try {
+      const r = await fetch(url, { cache: 'no-store' });
+      if (r.ok) {
+        const data = await r.json();
+        if (Array.isArray(data) && data.length) {
+          const hint = document.getElementById('syncedHint');
+          if (hint) hint.textContent = '📡 已同步真实线索 ' + data.length + ' 条（每日 10:00 自动更新）';
+          return data;
+        }
+      }
+    } catch (e) { /* 尝试下一个源 */ }
+  }
+  const hint = document.getElementById('syncedHint');
+  if (hint) hint.textContent = '📡 内置线索快照 ' + REAL_LEADS.length + ' 条（离线模式，每日 10:00 联网更新）';
+  return [...REAL_LEADS];
 }
 
 // ========== Render ==========
