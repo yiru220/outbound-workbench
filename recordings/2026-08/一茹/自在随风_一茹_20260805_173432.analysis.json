@@ -1,0 +1,15 @@
+{
+  "transcript": "",
+  "score": 0,
+  "dimensions": [],
+  "strengths": [],
+  "weaknesses": [
+    "录音中未识别到有效语音内容，无法分析"
+  ],
+  "summary": "未识别到语音，请确认录音正常或重新录制。",
+  "provider_label": "硅基流动（免费）",
+  "asr_model": "FunAudioLLM/SenseVoiceSmall",
+  "llm_model": "",
+  "analysis_error": "",
+  "analyzed_at": "2026-08-05T09:34:47.498Z"
+}
