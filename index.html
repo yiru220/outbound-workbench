@@ -499,9 +499,6 @@
     <div class="search-bar">
       <input type="text" id="searchInput" placeholder="搜索姓名/手机号/平台...">
     </div>
-    <label class="mine-filter" title="只看分配给我（当前登录人）的线索">
-      <input type="checkbox" id="mineOnly" onchange="renderLeads()"> 只看我负责的
-    </label>
     <div class="lead-list" id="leadList"></div>
   </aside>
 
@@ -563,7 +560,7 @@ const WEBHOOK_FIELDS = {
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-05a';
+const APP_VERSION = '2026-08-05b';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -1738,6 +1735,8 @@ let currentTab = 'call';
 let leads = [];
 let calls = [];
 let USER_MAP = {};
+// 省下拉选项（26 个省/直辖市 + 其他），可按实际覆盖省份增减
+const PROVINCES = ['广东','江苏','浙江','山东','河南','四川','湖北','湖南','河北','福建','安徽','上海','北京','天津','重庆','辽宁','陕西','江西','广西','云南','贵州','山西','黑龙江','吉林','甘肃','海南'];
 // 客户补充信息（性别/省/市/是否自有门店），按 record_id 存储于 localStorage
 let leadExtras = {};
 try { leadExtras = JSON.parse(localStorage.getItem('outbound_extras') || '{}'); } catch(e) { leadExtras = {}; }
@@ -1773,14 +1772,11 @@ function ownerIdForName(name) {
   }
   return null;
 }
-// Compact chip for the lead list card
+// Compact chip for the lead list card —— 显示「初步联系人（owner_name）」姓名
 function ownerChip(l) {
-  const id = l.owner_id || '';
-  const name = ownerNameOf(id) || l.owner_name || '';
-  if (!name && !id) return '';
-  const color = name ? '#2b6cb0' : '#aaa';
-  const label = name || id;
-  return `<div style="font-size:11px;color:${color};margin-top:4px;">对接人: ${label}</div>`;
+  const name = l.owner_name || ownerNameOf(l.owner_id) || '';
+  if (!name) return '';
+  return `<div style="font-size:11px;color:#2b6cb0;margin-top:4px;">对接人: ${name}</div>`;
 }
 // Detail block for the call panel
 function ownerChipDetail(l) {
@@ -1832,7 +1828,9 @@ function login() {
   document.getElementById('app').classList.add('active');
   document.getElementById('currentUser').textContent = currentUser;
   loadLeads().then(data => {
-    leads = data;
+    // 按登录人隔离：只显示「初步联系人（owner_name）」为当前登录人的线索，不可见他人线索
+    const me = (currentUser || '').trim();
+    leads = (data || []).filter(l => (l.owner_name || '').trim() === me);
     updateStats();
     renderLeads();
     renderMain();
@@ -1867,31 +1865,22 @@ async function loadLeads() {
 
 // ========== Render ==========
 function updateStats() {
-  document.getElementById('callCount').textContent = calls.length;
+  // 仅统计当前登录人相关的数据（线索已按本人过滤；通话/已上传按 user_name 过滤）
+  const myCalls = calls.filter(c => c.user_name === currentUser);
+  document.getElementById('callCount').textContent = myCalls.length;
   document.getElementById('leadCount').textContent = leads.length;
-  const uploaded = calls.filter(c => c.uploaded).length;
+  const uploaded = myCalls.filter(c => c.uploaded).length;
   document.getElementById('uploadedCount').textContent = uploaded;
 }
 
 function renderLeads() {
   const search = (document.getElementById('searchInput').value || '').toLowerCase();
-  const mineCb = document.getElementById('mineOnly');
-  const mineOnly = mineCb && mineCb.checked;
-  const myId = ownerIdForName(currentUser);
   const filtered = leads.filter(l => {
-    if (mineOnly) {
-      if (!myId) return false;
-      if (l.owner_id !== myId) return false;
-    }
     if (!search) return true;
     return (l.name + l.phone + l.account_name + l.platform + l.feedback).toLowerCase().includes(search);
   });
 
   const container = document.getElementById('leadList');
-  if (mineOnly && !myId) {
-    container.innerHTML = '<div style="text-align:center;padding:40px 0;color:#999;font-size:13px;line-height:1.6;">当前登录人「' + (currentUser || '未登录') + '」未在映射表中，<br>无法筛选「我负责的」。<br>请在 user_map.json 中补充姓名映射。</div>';
-    return;
-  }
   if (filtered.length === 0) {
     container.innerHTML = '<div style="text-align:center;padding:40px 0;color:#999;font-size:13px;">没有匹配的线索</div>';
     return;
@@ -2003,7 +1992,7 @@ function renderScriptPanel(l) {
     const done = !!checked[i];
     const sayHtml = s.say.replace(/\{N\}/g, escapeHtml(salute));
     return `
-      <div class="step-card ${done ? 'done' : ''} ${s.core ? 'core' : ''}">
+      <div class="step-card ${done ? 'done' : ''} ${s.core ? 'core' : ''}" id="stepCard${i}">
         <div class="step-top" onclick="toggleScriptStep(${i})">
           <div class="step-chk">✓</div>
           <div class="step-name">${i + 1}. ${s.name}</div>
@@ -2023,8 +2012,8 @@ function renderScriptPanel(l) {
     <div class="script-panel">
       <div class="script-head">
         <div class="t"><span>${CALL_SCRIPT.title}</span><span class="time">${CALL_SCRIPT.time}</span></div>
-        <div class="sub">跟着念 · 点标题打钩记录进度（${doneCount}/${CALL_SCRIPT.steps.length}）</div>
-        <div class="script-bar"><i style="width:${pct}%"></i></div>
+        <div class="sub" id="scriptSub">跟着念 · 点标题打钩记录进度（${doneCount}/${CALL_SCRIPT.steps.length}）</div>
+        <div class="script-bar"><i id="scriptBarFill" style="width:${pct}%"></i></div>
       </div>
       <div class="script-rule">${CALL_SCRIPT.rule}</div>
       <div class="script-body">${stepsHtml}</div>
@@ -2045,7 +2034,17 @@ function toggleScriptStep(i) {
   const id = selectedLead.record_id;
   scriptChecked[id] = scriptChecked[id] || {};
   scriptChecked[id][i] = !scriptChecked[id][i];
-  refreshScriptPanel();
+  // 原地更新勾选状态与进度条，避免整块重渲染导致话术面板滚动位置被重置
+  const card = document.getElementById('stepCard' + i);
+  if (card) card.classList.toggle('done', !!scriptChecked[id][i]);
+  const checked = scriptChecked[id];
+  const total = CALL_SCRIPT.steps.length;
+  const doneCount = CALL_SCRIPT.steps.filter((_, k) => checked[k]).length;
+  const pct = Math.round(doneCount / total * 100);
+  const fill = document.getElementById('scriptBarFill');
+  if (fill) fill.style.width = pct + '%';
+  const sub = document.getElementById('scriptSub');
+  if (sub) sub.textContent = '跟着念 · 点标题打钩记录进度（' + doneCount + '/' + total + '）';
 }
 
 function resetScript() {
@@ -2114,7 +2113,6 @@ function renderMain() {
             <div><div class="label">状态</div><div class="value" style="font-size:13px;">${l.is_contacted || '未对接'}</div></div>
             <div><div class="label">合作</div><div class="value" style="font-size:13px;">${l.is_cooperating || '-'}</div></div>
           </div>
-          ${ownerChipDetail(l)}
           ${l.feedback ? `<div style="margin-top:12px;"><div class="label">之前反馈</div><div style="font-size:13px;color:#666;">${l.feedback}</div></div>` : ''}
         </div>
         <div id="timerDisplay" class="timer" style="display:none;">00:00</div>
@@ -2122,7 +2120,7 @@ function renderMain() {
         <div id="uploadArea"></div>
         <div class="hint" id="recordHint">点击后开始录音，用手机拨打客户，开启外放</div>
         <div class="extra-info">
-            <div class="extra-title">📇 客户补充信息（填完点回传 → 智能表格）</div>
+            <div class="extra-title">📇 客户补充信息（填完点回传）</div>
             ${synced ? `<div class="synced-note">✅ 该客户已于 <b>${synced}</b> 回传，无需重复回传</div>` : ''}
             <div class="extra-grid">
               <div class="extra-field">
@@ -2133,7 +2131,7 @@ function renderMain() {
               </div>
               <div class="extra-field">
                 <label>省</label>
-                <input id="exProvince" type="text" placeholder="如 广东" ${synced ? 'disabled' : ''} onchange="saveExtra('province',this.value)">
+                <select id="exProvince" ${synced ? 'disabled' : ''} onchange="saveExtra('province',this.value)"></select>
               </div>
               <div class="extra-field">
                 <label>市</label>
@@ -2189,6 +2187,14 @@ function saveExtra(key, val) {
 function initExtraFields(l) {
   if (!l) return;
   const ex = leadExtras[l.record_id] || {};
+  // 省：下拉选项（26 省 + 其他），仅首次填充
+  const prov = document.getElementById('exProvince');
+  if (prov && prov.options.length === 0) {
+    const mk = (v, t) => { const o = document.createElement('option'); o.value = v; o.textContent = (t == null ? v : t); return o; };
+    prov.appendChild(mk('', '未填'));
+    PROVINCES.forEach(p => prov.appendChild(mk(p)));
+    prov.appendChild(mk('其他'));
+  }
   const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
   set('exGender', ex.gender);
   set('exProvince', ex.province);
