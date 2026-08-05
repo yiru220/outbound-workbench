@@ -1,0 +1,13 @@
+{
+  "transcript": "你好。😔我是。天九康遥五公司呢你好，上午好，下午好。看到你视频号上联系我们，想咨询项目合作。",
+  "score": null,
+  "dimensions": [],
+  "strengths": [],
+  "weaknesses": [],
+  "summary": "",
+  "provider_label": "硅基流动（免费）",
+  "asr_model": "FunAudioLLM/SenseVoiceSmall",
+  "llm_model": "",
+  "analysis_error": "硅基流动（免费） → Expected ',' or '}' after property value in JSON at position 50 (line 1 column 51)",
+  "analyzed_at": "2026-08-05T06:55:26.537Z"
+}
