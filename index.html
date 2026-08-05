@@ -598,7 +598,7 @@ const WEBHOOK_FIELDS = {
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-05k';
+const APP_VERSION = '2026-08-05l';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -2162,6 +2162,7 @@ function renderMain() {
 
     const l = selectedLead;
     const synced = syncedLeads[l.record_id];
+    const leadTimeStr = l.time ? fmtDate(new Date(Number(l.time))) : '—';
     container.innerHTML = `
      <div class="call-layout">
       <div class="work-col">
@@ -2173,16 +2174,14 @@ function renderMain() {
               <div class="value" style="font-size:18px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${l.name || l.account_name || '未命名'}</div>
             </div>
             <div style="flex:0 0 auto;">
-              <div class="label">联系电话</div>
+              <div class="label">联系方式</div>
               <div class="phone-value">${l.phone || '无号码'}</div>
             </div>
           </div>
           <div style="display:flex;gap:20px;margin-top:12px;">
             <div><div class="label">平台</div><div class="value" style="font-size:13px;">${l.platform || '-'}</div></div>
-            <div><div class="label">状态</div><div class="value" style="font-size:13px;">${l.is_contacted || '未对接'}</div></div>
-            <div><div class="label">合作</div><div class="value" style="font-size:13px;">${l.is_cooperating || '-'}</div></div>
+            <div><div class="label">线索时间</div><div class="value" style="font-size:13px;">${leadTimeStr}</div></div>
           </div>
-          ${l.feedback ? `<div style="margin-top:12px;"><div class="label">之前反馈</div><div style="font-size:13px;color:#666;">${l.feedback}</div></div>` : ''}
         </div>
         <div class="action-card">
           <button class="reached-btn ${leadReached[l.record_id] ? 'on' : ''}" id="reachedBtn" onclick="toggleReached()">${leadReached[l.record_id] ? '✅ 已触达（点击取消）' : '📞 标记为已触达'}</button>
