@@ -586,12 +586,14 @@ const WEBHOOK_FIELDS = {
   province: 'fu0uQ1',   // 省 (单选)
   city:     'fz0DpX',   // 市 (文本)
   hasStore: 'fVBgw9',   // 是否自有门店 (单选)
+  keyCustomer: 'fcMF2G', // 重点客户 (单选：是/否)
+  inviteGroup: 'fyGPwu', // 邀约进群 (单选：已邀约/拒绝进群/其他)
   phone:    'fuvsCp',   // 手机号 (文本)
   date:     'fEDPIZ'    // 回传日期 (日期时间)
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-05e';
+const APP_VERSION = '2026-08-05f';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -2202,6 +2204,18 @@ function renderMain() {
                   <option value="">未填</option><option>是</option><option>否</option>
                 </select>
               </div>
+              <div class="extra-field">
+                <label>重点客户</label>
+                <select id="exKeyCustomer" ${synced ? 'disabled' : ''} onchange="saveExtra('keyCustomer',this.value)">
+                  <option value="">未填</option><option>是</option><option>否</option>
+                </select>
+              </div>
+              <div class="extra-field">
+                <label>邀约进群</label>
+                <select id="exInviteGroup" ${synced ? 'disabled' : ''} onchange="saveExtra('inviteGroup',this.value)">
+                  <option value="">未填</option><option>已邀约</option><option>拒绝进群</option><option>其他</option>
+                </select>
+              </div>
             </div>
             <button class="sync-btn" id="syncBtn" ${synced ? 'disabled' : ''} onclick="syncLeadExtra()">${synced ? '✅ 已回传' : '🚀 回传客户信息'}</button>
             <div class="sync-status" id="syncStatus">${synced ? '该客户已回传，按钮已禁用' : ''}</div>
@@ -2259,6 +2273,8 @@ function initExtraFields(l) {
   set('exProvince', ex.province);
   set('exCity', ex.city);
   set('exStore', ex.hasStore);
+  set('exKeyCustomer', ex.keyCustomer);
+  set('exInviteGroup', ex.inviteGroup);
 }
 // 回传时间：目标表为日期类型，年月日格式 YYYY-MM-DD
 function fmtDate(d) {
@@ -2281,6 +2297,8 @@ async function syncLeadExtra() {
   if (ex.province) values[F.province] = [{ text: ex.province }];
   if (ex.city)     values[F.city]     = [{ type: 'text', text: ex.city }];
   if (ex.hasStore) values[F.hasStore] = [{ text: ex.hasStore }];
+  if (ex.keyCustomer) values[F.keyCustomer] = [{ text: ex.keyCustomer }];
+  if (ex.inviteGroup) values[F.inviteGroup] = [{ text: ex.inviteGroup }];
   const phoneDigits = String(phone).replace(/\D/g, '');
   if (phoneDigits) values[F.phone] = [{ type: 'text', text: phoneDigits }];
   values[F.date] = timeStr;  // 回传日期：年月日格式，写入当天日期
