@@ -1,6 +1,8 @@
 // Cloudflare Worker：双用途代理
 //   POST /            → 转发到企业微信智能表格 webhook（回传客户信息，解决浏览器跨域）
-//   POST /github      → 转发到 GitHub Contents API 上传文件（录音等）
+//   POST /github      → 转发到 GitHub Contents API 上传/删除文件（录音等）
+//                       · 上传: { path, content, message, branch }
+//                       · 删除: { action:'delete', path, message, branch }
 //
 // 关于 GitHub Token（重要）：
 //   不在代码里写死 Token，而是从 Cloudflare Secret 环境变量 GITHUB_TOKEN 读取。
@@ -21,11 +23,11 @@ const GITHUB_BRANCH = 'main';
 
 // Worker 代码版本。改动代码时同步 +1，方便判断 Cloudflare 是否已部署最新版。
 // 自检：浏览器直接打开 https://outbound-webhook-proxy.yiru220.workers.dev/health
-const WORKER_VERSION = '2026-08-04n-mime';
+const WORKER_VERSION = '2026-08-05d-delete';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
@@ -88,7 +90,7 @@ async function handleWebhook(request) {
   }
 }
 
-// ---------- GitHub 上传代理（新增） ----------
+// ---------- GitHub 上传/删除代理 ----------
 async function handleGitHub(request, env) {
   const token = env.GITHUB_TOKEN;
   if (!token) {
@@ -101,6 +103,13 @@ async function handleGitHub(request, env) {
   } catch {
     return json({ error: 'Invalid JSON' }, 400);
   }
+
+  // 删除分支：{ action:'delete', path, message, branch }
+  if (payload.action === 'delete') {
+    if (!payload.path) return json({ error: 'path 为必填项' }, 400);
+    return handleGitHubDelete(payload.path, payload.message, payload.branch || GITHUB_BRANCH, token);
+  }
+
   const { path, content, message, branch } = payload;
   // sha 需要在下方自动解析时重新赋值，必须用 let（用 const 会导致 esbuild 构建失败）
   let sha = payload.sha;
@@ -149,6 +158,34 @@ async function handleGitHub(request, env) {
     });
   } catch (e) {
     return json({ error: 'github proxy error: ' + e.message }, 502);
+  }
+}
+
+// 删除 GitHub 文件（录音 / 分析 JSON）。先取 sha 再 DELETE；404 视为已删除。
+async function handleGitHubDelete(path, message, branch, token) {
+  const apiUrl = `https://api.github.com/repos/${GITHUB_REPO}/contents/${path}`;
+  const headers = {
+    'Authorization': `Bearer ${token}`,
+    'Accept': 'application/vnd.github.v3+json',
+    'User-Agent': 'outbound-github-proxy',
+  };
+  try {
+    const g = await fetch(apiUrl, { headers });
+    if (g.status === 404) return json({ ok: true, deleted: false, note: '文件不存在（视为已删除）' });
+    if (!g.ok) return json({ error: '获取文件信息失败: HTTP ' + g.status }, 502);
+    const gj = await g.json();
+    const delResp = await fetch(apiUrl, {
+      method: 'DELETE',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: message || 'delete', branch, sha: gj.sha }),
+    });
+    const text = await delResp.text();
+    return new Response(text, {
+      status: delResp.status,
+      headers: { 'Content-Type': 'application/json; charset=utf-8', ...CORS },
+    });
+  } catch (e) {
+    return json({ error: 'github delete error: ' + e.message }, 502);
   }
 }
 
