@@ -329,6 +329,7 @@ async function runChat(env, provider, sys, user) {
         temperature: 0.3,
         max_tokens: 1400,
         enable_thinking: false,
+        response_format: { type: 'json_object' },
       }),
     });
     const j = await r.json();
@@ -461,9 +462,37 @@ async function handleTranscribe(request, env) {
 
 function extractJson(s) {
   if (typeof s !== 'string') return '{}';
-  const a = s.indexOf('{'), b = s.lastIndexOf('}');
+  let t = String(s).trim();
+  // 去掉 ```json ... ``` / ``` ... ``` 代码块包裹
+  const fence = t.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fence) t = fence[1].trim();
+  // 截取第一个 { 到最后一个 }
+  const a = t.indexOf('{'), b = t.lastIndexOf('}');
   if (a === -1 || b === -1) return '{}';
-  return s.slice(a, b + 1);
+  t = t.slice(a, b + 1);
+
+  const tryParse = (str) => { try { JSON.parse(str); return str; } catch (e) { return null; } };
+  let ok = tryParse(t);
+  if (ok) return ok;
+
+  // 兜底：温和修复常见模型瑕疵（按优先级尝试，能恢复大部分坏 JSON）
+  const variants = [];
+  // 1) 中文引号 -> 英文引号
+  variants.push(t.replace(/[“”]/g, '"').replace(/[‘’]/g, "'"));
+  // 2) 去掉尾随逗号
+  variants.push(variants[0].replace(/,(\s*[}\]])/g, '$1'));
+  // 3) 单引号键/值 -> 双引号（键 'x': ；值 : 'x'）
+  variants.push(variants[0]
+    .replace(/([{\[,]\s*)'([^']+)'\s*:/g, '$1"$2":')
+    .replace(/:\s*'([^']*)'/g, ': "$1"'));
+  // 4) 单引号整体替换（兜底，评分文案多为中文，风险低）
+  variants.push(variants[0].replace(/'/g, '"'));
+
+  for (const v of variants) {
+    const r = tryParse(v);
+    if (r) return r;
+  }
+  return '{}';
 }
 
 function json(obj, status) {
