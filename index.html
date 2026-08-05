@@ -594,7 +594,7 @@ const WEBHOOK_FIELDS = {
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-05i';
+const APP_VERSION = '2026-08-05j';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -2201,18 +2201,18 @@ function renderMain() {
                 </select>
               </div>
               <div class="extra-field">
+                <label>年龄（根据声音估计）</label>
+                <select id="exAge" ${synced ? 'disabled' : ''} onchange="saveExtra('age',this.value)">
+                  <option value="">未填</option><option>30以下</option><option>30-40</option><option>40-50</option><option>50-60</option><option>60以上</option>
+                </select>
+              </div>
+              <div class="extra-field">
                 <label>省</label>
                 <select id="exProvince" ${synced ? 'disabled' : ''} onchange="saveExtra('province',this.value)"></select>
               </div>
               <div class="extra-field">
                 <label>市</label>
                 <input id="exCity" type="text" placeholder="如 深圳" ${synced ? 'disabled' : ''} onchange="saveExtra('city',this.value)">
-              </div>
-              <div class="extra-field">
-                <label>是否自有门店</label>
-                <select id="exStore" ${synced ? 'disabled' : ''} onchange="saveExtra('hasStore',this.value)">
-                  <option value="">未填</option><option>是</option><option>否</option>
-                </select>
               </div>
               <div class="extra-field">
                 <label>重点客户</label>
@@ -2227,9 +2227,9 @@ function renderMain() {
                 </select>
               </div>
               <div class="extra-field">
-                <label>年龄（根据声音估计）</label>
-                <select id="exAge" ${synced ? 'disabled' : ''} onchange="saveExtra('age',this.value)">
-                  <option value="">未填</option><option>30以下</option><option>30-40</option><option>40-50</option><option>50-60</option><option>60以上</option>
+                <label>是否自有门店</label>
+                <select id="exStore" ${synced ? 'disabled' : ''} onchange="saveExtra('hasStore',this.value)">
+                  <option value="">未填</option><option>是</option><option>否</option>
                 </select>
               </div>
             </div>
