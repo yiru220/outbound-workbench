@@ -122,6 +122,7 @@
     display: flex; gap: 16px; font-size: 12px; color: var(--text-secondary);
   }
   .lead-card .phone { font-family: "SF Mono", "Menlo", monospace; }
+  .lead-card .lead-time { white-space: nowrap; }
   /* 已触达：列表卡片变暗 + 删除线 + 绿色徽标 */
   .lead-card.reached { opacity: 0.45; filter: grayscale(0.4); }
   .lead-card.reached:hover { opacity: 0.7; filter: none; }
@@ -383,11 +384,13 @@
     display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px;
   }
   .call-panel .extra-field select,
-  .call-panel .extra-field input {
+  .call-panel .extra-field input,
+  .call-panel .extra-field textarea {
     width: 100%; padding: 7px 10px; font-size: 13px;
     border: 1px solid var(--border); border-radius: 8px; background: #fff;
-    box-sizing: border-box;
+    box-sizing: border-box; font-family: inherit; resize: vertical;
   }
+  .call-panel .extra-field.extra-remark { grid-column: 1 / -1; margin-top: 4px; }
   .call-panel .sync-btn {
     width: 100%; margin-top: 12px; padding: 11px; font-size: 14px; font-weight: 600;
     color: #fff; background: var(--primary); border: none; border-radius: 10px; cursor: pointer;
@@ -589,12 +592,13 @@ const WEBHOOK_FIELDS = {
   keyCustomer: 'fcMF2G', // 重点客户 (单选：是/否)
   inviteGroup: 'fyGPwu', // 邀约进群 (单选：已邀约/拒绝进群/其他)
   age:      'faUSXZ',   // 年龄（根据声音估计）(单选：30以下/30-40/40-50/50-60/60以上)
+  remark:   'fXGIQi',   // 备注 (文本)
   phone:    'fuvsCp',   // 手机号 (文本)
   date:     'fEDPIZ'    // 回传日期 (日期时间)
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-05j';
+const APP_VERSION = '2026-08-05k';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -1934,6 +1938,7 @@ function renderLeads() {
 
   container.innerHTML = filtered.map(l => {
     const isActive = selectedLead && selectedLead.record_id === l.record_id;
+    const leadTime = l.time ? fmtDate(new Date(Number(l.time))) : '—';
     return `
       <div class="lead-card ${isActive ? 'active' : ''} ${leadReached[l.record_id] ? 'reached' : ''}" data-rid="${l.record_id}" onclick="selectLead('${l.record_id}')">
         <div class="row1">
@@ -1942,11 +1947,9 @@ function renderLeads() {
         </div>
         <div class="row2">
           <span class="phone">${l.phone || '无号码'}</span>
-          <span>${l.is_contacted || '未对接'}</span>
+          <span class="lead-time">🕒 ${leadTime}</span>
           <span class="reached-badge">✓ 已触达</span>
         </div>
-        ${l.feedback ? `<div style="font-size:11px;color:#999;margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${l.feedback}</div>` : ''}
-        ${ownerChip(l)}
       </div>
     `;
   }).join('');
@@ -2233,6 +2236,10 @@ function renderMain() {
                 </select>
               </div>
             </div>
+            <div class="extra-field extra-remark">
+              <label>备注</label>
+              <textarea id="exRemark" rows="2" placeholder="可填写通话要点、客户意向等" ${synced ? 'disabled' : ''} onchange="saveExtra('remark',this.value)"></textarea>
+            </div>
             <button class="sync-btn" id="syncBtn" ${synced ? 'disabled' : ''} onclick="syncLeadExtra()">${synced ? '✅ 已回传' : '🚀 回传客户信息'}</button>
             <div class="sync-status" id="syncStatus">${synced ? '该客户已回传，按钮已禁用' : ''}</div>
         </div>
@@ -2292,6 +2299,7 @@ function initExtraFields(l) {
   set('exKeyCustomer', ex.keyCustomer);
   set('exInviteGroup', ex.inviteGroup);
   set('exAge', ex.age);
+  set('exRemark', ex.remark);
 }
 // 回传时间：目标表为日期类型，年月日格式 YYYY-MM-DD
 function fmtDate(d) {
@@ -2317,6 +2325,7 @@ async function syncLeadExtra() {
   if (ex.keyCustomer) values[F.keyCustomer] = [{ text: ex.keyCustomer }];
   if (ex.inviteGroup) values[F.inviteGroup] = [{ text: ex.inviteGroup }];
   if (ex.age) values[F.age] = [{ text: ex.age }];
+  if (ex.remark) values[F.remark] = [{ type: 'text', text: ex.remark }];
   const phoneDigits = String(phone).replace(/\D/g, '');
   if (phoneDigits) values[F.phone] = [{ type: 'text', text: phoneDigits }];
   values[F.date] = timeStr;  // 回传日期：年月日格式，写入当天日期
