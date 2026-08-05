@@ -425,7 +425,9 @@
   .recordings-block { margin-top: 16px; border-top: 1px dashed var(--border); padding-top: 14px; }
   .recordings-title { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 10px; }
   .recordings-empty { font-size: 12px; color: var(--text-muted); padding: 8px 0; }
-  .rec-item { background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 12px; }
+  .rec-item { position: relative; background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 12px; }
+  .rec-del { position: absolute; top: 8px; right: 8px; z-index: 2; padding: 4px 9px; font-size: 12px; font-weight: 600; color: #fff; background: var(--danger); border: none; border-radius: 8px; cursor: pointer; }
+  .rec-del:hover { background: #c92a2a; }
   .rec-meta { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
   .rec-audio { width: 100%; margin-bottom: 8px; }
   .rec-noaudio { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
@@ -2385,6 +2387,7 @@ function renderRecordingItem(c) {
   const analyzed = c.analysis && (c.analysis.score != null || c.analysis.transcript);
   return `
   <div class="rec-item" id="rec-${c.call_id}">
+    <button class="rec-del" onclick="deleteCall('${c.call_id}')" title="删除本地与服务器录音">🗑️ 删除</button>
     <div class="rec-meta"><b>${escapeHtml(time)}</b> · 时长 ${escapeHtml(dur)} · ${escapeHtml(c.user_name || '')}</div>
     ${hasAudio
       ? `<audio class="rec-audio" controls preload="none" src="${src}"></audio>`
@@ -2392,7 +2395,6 @@ function renderRecordingItem(c) {
     <div class="rec-actions">
       <button class="btn btn-sm btn-secondary" id="txbtn-${c.call_id}" onclick="transcribeCall('${c.call_id}')" ${hasAudio ? '' : 'disabled title="无可分析音频"'}>🎯 转写分析</button>
       ${analyzed && c.analysis.score != null ? `<span class="score-pill" title="综合得分">${c.analysis.score}分</span>` : ''}
-      <button class="btn btn-sm btn-danger" onclick="deleteCall('${c.call_id}')" title="删除本地与服务器录音">🗑️ 删除</button>
     </div>
     <div class="rec-status" id="txstatus-${c.call_id}">${analyzed ? '' : '点击上方按钮，自动转文字 + 打分 + 优缺点分析'}</div>
     <div class="rec-analysis" id="analysis-${c.call_id}">${analyzed ? renderAnalysis(c.analysis) : ''}</div>
