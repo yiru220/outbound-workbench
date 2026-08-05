@@ -121,6 +121,15 @@
     display: flex; gap: 16px; font-size: 12px; color: var(--text-secondary);
   }
   .lead-card .phone { font-family: "SF Mono", "Menlo", monospace; }
+  /* 已触达：列表卡片变暗 + 删除线 + 绿色徽标 */
+  .lead-card.reached { opacity: 0.45; filter: grayscale(0.4); }
+  .lead-card.reached:hover { opacity: 0.7; filter: none; }
+  .lead-card.reached .name { text-decoration: line-through; text-decoration-color: #999; }
+  .lead-card .reached-badge {
+    display: none; font-size: 11px; color: #fff; background: #2f855a;
+    padding: 1px 7px; border-radius: 4px; font-weight: 600; white-space: nowrap;
+  }
+  .lead-card.reached .reached-badge { display: inline-block; }
 
   .search-bar {
     padding: 12px 20px; border-bottom: 1px solid var(--border);
@@ -328,6 +337,14 @@
     color: #fff; animation: pulse 1.5s infinite;
   }
   .record-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  /* 已触达标记按钮 */
+  .reached-btn {
+    width: 100%; margin: 14px 0 4px; padding: 11px;
+    border-radius: 10px; border: 1px solid var(--border); background: var(--card);
+    color: var(--text); font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.15s;
+  }
+  .reached-btn:hover { border-color: var(--primary); }
+  .reached-btn.on { background: #2f855a; border-color: #2f855a; color: #fff; }
   @keyframes pulse {
     0%, 100% { box-shadow: 0 0 0 0 rgba(226, 75, 75, 0.4); }
     50% { box-shadow: 0 0 0 16px rgba(226, 75, 75, 0); }
@@ -560,7 +577,7 @@ const WEBHOOK_FIELDS = {
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-05b';
+const APP_VERSION = '2026-08-05c';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -1743,6 +1760,9 @@ try { leadExtras = JSON.parse(localStorage.getItem('outbound_extras') || '{}'); 
 // 已回传记录：record_id -> 回传日期(YYYY-MM-DD)，用于禁用重复回传
 let syncedLeads = {};
 try { syncedLeads = JSON.parse(localStorage.getItem('outbound_synced') || '{}'); } catch(e) { syncedLeads = {}; }
+// 已触达标记：record_id -> true，用于区分「已联络 / 未联系」线索（本地持久化，刷新不丢）
+let leadReached = {};
+try { leadReached = JSON.parse(localStorage.getItem('outbound_reached') || '{}'); } catch(e) { leadReached = {}; }
 
 // GitHub 上传统一走 Worker 代理（GITHUB_PROXY_URL），前端不存放 Token。
 // 此处 token 仅作为「关闭代理时」的直连兜底（选填，由用户在设置里填）。
@@ -1889,7 +1909,7 @@ function renderLeads() {
   container.innerHTML = filtered.map(l => {
     const isActive = selectedLead && selectedLead.record_id === l.record_id;
     return `
-      <div class="lead-card ${isActive ? 'active' : ''}" onclick="selectLead('${l.record_id}')">
+      <div class="lead-card ${isActive ? 'active' : ''} ${leadReached[l.record_id] ? 'reached' : ''}" data-rid="${l.record_id}" onclick="selectLead('${l.record_id}')">
         <div class="row1">
           <span class="name">${l.name || l.account_name || '未命名'}</span>
           <span class="platform">${l.platform || ''}</span>
@@ -1897,6 +1917,7 @@ function renderLeads() {
         <div class="row2">
           <span class="phone">${l.phone || '无号码'}</span>
           <span>${l.is_contacted || '未对接'}</span>
+          <span class="reached-badge">✓ 已触达</span>
         </div>
         ${l.feedback ? `<div style="font-size:11px;color:#999;margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${l.feedback}</div>` : ''}
         ${ownerChip(l)}
@@ -2047,6 +2068,25 @@ function toggleScriptStep(i) {
   if (sub) sub.textContent = '跟着念 · 点标题打钩记录进度（' + doneCount + '/' + total + '）';
 }
 
+function toggleReached() {
+  if (!selectedLead) return;
+  const id = selectedLead.record_id;
+  if (!id) return;
+  if (leadReached[id]) delete leadReached[id]; else leadReached[id] = true;
+  try { localStorage.setItem('outbound_reached', JSON.stringify(leadReached)); } catch(e) {}
+  const on = !!leadReached[id];
+  // 左侧列表卡片原地更新（不重渲染，保留列表滚动位置）
+  document.querySelectorAll('.lead-card').forEach(c => {
+    if (c.dataset.rid === id) c.classList.toggle('reached', on);
+  });
+  // 按钮原地更新（文案 + 样式）
+  const btn = document.getElementById('reachedBtn');
+  if (btn) {
+    btn.classList.toggle('on', on);
+    btn.textContent = on ? '✅ 已触达（点击取消）' : '📞 标记为已触达';
+  }
+}
+
 function resetScript() {
   if (!selectedLead) return;
   scriptChecked[selectedLead.record_id] = {};
@@ -2115,6 +2155,7 @@ function renderMain() {
           </div>
           ${l.feedback ? `<div style="margin-top:12px;"><div class="label">之前反馈</div><div style="font-size:13px;color:#666;">${l.feedback}</div></div>` : ''}
         </div>
+        <button class="reached-btn ${leadReached[l.record_id] ? 'on' : ''}" id="reachedBtn" onclick="toggleReached()">${leadReached[l.record_id] ? '✅ 已触达（点击取消）' : '📞 标记为已触达'}</button>
         <div id="timerDisplay" class="timer" style="display:none;">00:00</div>
         <button class="record-btn" id="recordBtn" onclick="toggleRecording()">开始录音</button>
         <div id="uploadArea"></div>
