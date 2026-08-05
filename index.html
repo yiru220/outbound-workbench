@@ -588,12 +588,13 @@ const WEBHOOK_FIELDS = {
   hasStore: 'fVBgw9',   // 是否自有门店 (单选)
   keyCustomer: 'fcMF2G', // 重点客户 (单选：是/否)
   inviteGroup: 'fyGPwu', // 邀约进群 (单选：已邀约/拒绝进群/其他)
+  age:      'faUSXZ',   // 年龄（根据声音估计）(单选：30以下/30-40/40-50/50-60/60以上)
   phone:    'fuvsCp',   // 手机号 (文本)
   date:     'fEDPIZ'    // 回传日期 (日期时间)
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-05h';
+const APP_VERSION = '2026-08-05i';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -1770,7 +1771,7 @@ let calls = [];
 let USER_MAP = {};
 // 省下拉选项（26 个省/直辖市 + 其他），可按实际覆盖省份增减
 const PROVINCES = ['广东','江苏','浙江','山东','河南','四川','湖北','湖南','河北','福建','安徽','上海','北京','天津','重庆','辽宁','陕西','江西','广西','云南','贵州','山西','黑龙江','吉林','甘肃','海南'];
-// 客户补充信息（性别/省/市/是否自有门店），按 record_id 存储于 localStorage
+// 客户补充信息（性别/省/市/是否自有门店/重点客户/邀约进群/年龄），按 record_id 存储于 localStorage
 let leadExtras = {};
 try { leadExtras = JSON.parse(localStorage.getItem('outbound_extras') || '{}'); } catch(e) { leadExtras = {}; }
 // 已回传记录：record_id -> 回传日期(YYYY-MM-DD)，用于禁用重复回传
@@ -2225,6 +2226,12 @@ function renderMain() {
                   <option value="">未填</option><option>已邀约</option><option>拒绝进群</option><option>其他</option>
                 </select>
               </div>
+              <div class="extra-field">
+                <label>年龄（根据声音估计）</label>
+                <select id="exAge" ${synced ? 'disabled' : ''} onchange="saveExtra('age',this.value)">
+                  <option value="">未填</option><option>30以下</option><option>30-40</option><option>40-50</option><option>50-60</option><option>60以上</option>
+                </select>
+              </div>
             </div>
             <button class="sync-btn" id="syncBtn" ${synced ? 'disabled' : ''} onclick="syncLeadExtra()">${synced ? '✅ 已回传' : '🚀 回传客户信息'}</button>
             <div class="sync-status" id="syncStatus">${synced ? '该客户已回传，按钮已禁用' : ''}</div>
@@ -2284,6 +2291,7 @@ function initExtraFields(l) {
   set('exStore', ex.hasStore);
   set('exKeyCustomer', ex.keyCustomer);
   set('exInviteGroup', ex.inviteGroup);
+  set('exAge', ex.age);
 }
 // 回传时间：目标表为日期类型，年月日格式 YYYY-MM-DD
 function fmtDate(d) {
@@ -2308,6 +2316,7 @@ async function syncLeadExtra() {
   if (ex.hasStore) values[F.hasStore] = [{ text: ex.hasStore }];
   if (ex.keyCustomer) values[F.keyCustomer] = [{ text: ex.keyCustomer }];
   if (ex.inviteGroup) values[F.inviteGroup] = [{ text: ex.inviteGroup }];
+  if (ex.age) values[F.age] = [{ text: ex.age }];
   const phoneDigits = String(phone).replace(/\D/g, '');
   if (phoneDigits) values[F.phone] = [{ type: 'text', text: phoneDigits }];
   values[F.date] = timeStr;  // 回传日期：年月日格式，写入当天日期
