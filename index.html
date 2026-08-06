@@ -599,7 +599,7 @@ const WEBHOOK_FIELDS = {
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-06h';
+const APP_VERSION = '2026-08-06i';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -1852,6 +1852,11 @@ function init() {
   function buildUserDropdown() {
     const select = document.getElementById('userSelect');
     select.innerHTML = '';
+    // 默认占位选项，不预填真实姓名
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = '选择你的名字';
+    select.appendChild(placeholder);
     const names = Array.from(new Set(Object.values(USER_MAP).filter(Boolean)));
     const src = names.length ? names : TEAM;
     src.forEach(n => {
@@ -1859,6 +1864,8 @@ function init() {
       opt.value = n; opt.textContent = n;
       select.appendChild(opt);
     });
+    select.value = ''; // 确保默认选中占位项
+    document.getElementById('loginBtn').disabled = true;
     select.onchange = () => {
       document.getElementById('loginBtn').disabled = !select.value;
     };
