@@ -598,7 +598,7 @@ const WEBHOOK_FIELDS = {
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-06d';
+const APP_VERSION = '2026-08-06f';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -2070,7 +2070,6 @@ function renderScriptPanel(l) {
       <div class="script-body">${stepsHtml}</div>
       <div class="script-foot">
         <button class="script-reset" onclick="resetScript()">↺ 重置勾选（下一通电话）</button>
-        <div class="script-src">话术来源：《视频号线索初接话术及流程》</div>
       </div>
     </div>`;
 }
@@ -2529,7 +2528,6 @@ function renderAnalysis(a) {
         <div class="pc cons"><div class="pc-title">🔧 待改进</div><ul>${cons}</ul></div>
       </div>` : ''}
       ${transcript ? `<details class="transcript"><summary>📝 转写全文</summary><div class="transcript-body">${escapeHtml(transcript)}</div></details>` : ''}
-      ${engine ? `<div class="analysis-engine">引擎：${escapeHtml(engine)}</div>` : ''}
     </div>`;
 }
 
