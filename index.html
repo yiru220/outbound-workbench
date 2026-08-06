@@ -613,6 +613,8 @@ const GITHUB_PROXY_URL = WORKER_BASE + '/github';
 // 录音转写 + AI 分析代理（同一服务的 /transcribe 路由）。
 // 后端优先级（免费优先，服务端自动回退）：硅基流动 → OpenAI。
 const TRANSCRIBE_PROXY_URL = WORKER_BASE + '/transcribe';
+// 已回传状态云端同步（跨设备可见）：登录时拉取恢复灰显、回传成功时写回，复用 GitHub 存储。
+const RETURNED_PROXY_URL = WORKER_BASE + '/returned';
 
 // 把 GitHub blob 页链接转为 raw 直链（用于浏览器播放与 Worker 拉取音频）。
 function rawUrlOf(call) {
@@ -640,7 +642,7 @@ const WEBHOOK_FIELDS = {
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-06q';
+const APP_VERSION = '2026-08-06r';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -1921,20 +1923,50 @@ function init() {
   document.getElementById('searchInput').oninput = renderLeads;
 }
 
-function login() {
+async function login() {
   currentUser = document.getElementById('userSelect').value;
   if (!currentUser) return;
   document.getElementById('loginScreen').classList.remove('active');
   document.getElementById('app').classList.add('active');
   document.getElementById('currentUser').textContent = currentUser;
-  loadLeads().then(data => {
-    // 按登录人隔离：只显示「初步联系人（owner_name）」为当前登录人的线索，不可见他人线索
-    const me = (currentUser || '').trim();
-    leads = (data || []).filter(l => (l.owner_name || '').trim() === me);
-    updateStats();
-    renderLeads();
-    renderMain();
-  });
+  const data = await loadLeads();
+  const me = (currentUser || '').trim();
+  leads = (data || []).filter(l => (l.owner_name || '').trim() === me);
+  await restoreReturned();  // 跨设备恢复已回传状态（灰显 + 禁用按钮）
+  updateStats();
+  renderLeads();
+  renderMain();
+}
+
+// 从云端 returned.json 恢复「已回传」状态：换电脑 / 清缓存后也能正确显示灰显与禁用。
+// 云端优先：云端有记录的 record_id 视为已回传（合并进本地，不覆盖本地已有的）。
+async function restoreReturned() {
+  try {
+    const r = await fetch(RETURNED_PROXY_URL + '?_=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) return;
+    const cloud = await r.json();
+    if (!cloud || typeof cloud !== 'object') return;
+    let changed = false;
+    for (const [rid, d] of Object.entries(cloud)) {
+      if (!syncedLeads[rid]) { syncedLeads[rid] = d || new Date().toISOString().slice(0, 10); changed = true; }
+      if (!leadReached[rid]) { leadReached[rid] = true; changed = true; }
+    }
+    if (changed) {
+      try { localStorage.setItem('outbound_synced', JSON.stringify(syncedLeads)); } catch(e) {}
+      try { localStorage.setItem('outbound_reached', JSON.stringify(leadReached)); } catch(e) {}
+    }
+  } catch (e) { /* 离线 / 接口异常不影响本地使用 */ }
+}
+
+// 回传成功后把「已回传」状态同步到云端，供其他设备读取。
+async function syncReturnedToCloud(recordId, date) {
+  try {
+    await fetch(RETURNED_PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ record_id: recordId, date: date }),
+    });
+  } catch (e) { /* 失败不影响本地已回传标记 */ }
 }
 
 // 客户列表加载：优先每日同步的 leads.json，失败回退内置快照 REAL_LEADS。
@@ -2449,6 +2481,8 @@ async function syncLeadExtra() {
       leadReached[l.record_id] = true;
       try { localStorage.setItem('outbound_reached', JSON.stringify(leadReached)); } catch(e) {}
       renderMain();  // 重渲染：按钮变「已回传」并禁用，左侧卡片按 leadReached 变灰
+      // 跨设备同步：把已回传状态写回云端（换电脑 / 清缓存也能看到）
+      syncReturnedToCloud(l.record_id, timeStr);
     } else {
       st.style.color = 'red';
       st.textContent = '❌ 回传失败: ' + (msg || ('HTTP ' + resp.status));
