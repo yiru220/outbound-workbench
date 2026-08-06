@@ -381,11 +381,12 @@
     box-sizing: border-box; font-family: inherit; resize: vertical;
   }
   .call-panel .extra-field.extra-remark { grid-column: 1 / -1; margin-top: 4px; }
-  /* 省/市「自动识别」小按钮 */
+  /* 省/市「自动识别」小按钮：行内、小一号，紧贴标签文字后 */
   .call-panel .extra-field .mini-btn {
-    margin-top: 6px; width: 100%; padding: 6px 8px; font-size: 12px;
+    margin-left: 8px; padding: 1px 8px; font-size: 11px; line-height: 1.5;
     border: 1px dashed var(--border); background: #f8f9fa; color: var(--primary);
-    border-radius: 8px; cursor: pointer; transition: background .15s, border-color .15s;
+    border-radius: 6px; cursor: pointer; transition: background .15s, border-color .15s;
+    vertical-align: middle;
   }
   .call-panel .extra-field .mini-btn:hover:not(:disabled) { background: var(--primary-light); border-color: var(--primary); }
   .call-panel .extra-field .mini-btn:disabled { opacity: .5; cursor: not-allowed; }
@@ -598,7 +599,7 @@ const WEBHOOK_FIELDS = {
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-06f';
+const APP_VERSION = '2026-08-06g';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -2189,9 +2190,8 @@ function renderMain() {
                 </select>
               </div>
               <div class="extra-field">
-                <label>省（可参考手机号归属地）</label>
+                <label>省（可参考手机号归属地）<button type="button" class="mini-btn" ${synced ? 'disabled' : ''} onclick="autoFillRegion(true)">📍 自动识别</button></label>
                 <select id="exProvince" ${synced ? 'disabled' : ''} onchange="saveExtra('province',this.value)"></select>
-                <button type="button" class="mini-btn" ${synced ? 'disabled' : ''} onclick="autoFillRegion(true)">📍 自动识别</button>
               </div>
               <div class="extra-field">
                 <label>市</label>
