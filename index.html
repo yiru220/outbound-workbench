@@ -642,7 +642,7 @@ const WEBHOOK_FIELDS = {
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-06r';
+const APP_VERSION = '2026-08-06s';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -1940,12 +1940,17 @@ async function login() {
 
 // 从云端 returned.json 恢复「已回传」状态：换电脑 / 清缓存后也能正确显示灰显与禁用。
 // 云端优先：云端有记录的 record_id 视为已回传（合并进本地，不覆盖本地已有的）。
+// 反向补推：本地有、云端缺的（如旧版回传未同步的），自动推到云端，保证跨设备一致。
 async function restoreReturned() {
+  let cloud = {};
   try {
     const r = await fetch(RETURNED_PROXY_URL + '?_=' + Date.now(), { cache: 'no-store' });
-    if (!r.ok) return;
-    const cloud = await r.json();
-    if (!cloud || typeof cloud !== 'object') return;
+    if (r.ok) {
+      const c = await r.json();
+      if (c && typeof c === 'object') cloud = c;
+    }
+  } catch (e) { /* GET 失败继续，下面仍会补推本地状态 */ }
+  try {
     let changed = false;
     for (const [rid, d] of Object.entries(cloud)) {
       if (!syncedLeads[rid]) { syncedLeads[rid] = d || new Date().toISOString().slice(0, 10); changed = true; }
@@ -1954,6 +1959,11 @@ async function restoreReturned() {
     if (changed) {
       try { localStorage.setItem('outbound_synced', JSON.stringify(syncedLeads)); } catch(e) {}
       try { localStorage.setItem('outbound_reached', JSON.stringify(leadReached)); } catch(e) {}
+    }
+    // 本地 -> 云端：本地有、云端缺的（顺序补推，避免并发写入冲突）
+    const missing = Object.entries(syncedLeads).filter(([rid]) => !cloud[rid]);
+    for (const [rid, d] of missing) {
+      await syncReturnedToCloud(rid, d || new Date().toISOString().slice(0, 10));
     }
   } catch (e) { /* 离线 / 接口异常不影响本地使用 */ }
 }
