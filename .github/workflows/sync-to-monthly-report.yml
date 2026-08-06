@@ -3,6 +3,15 @@ name: Sync to monthly-report
 on:
   push:
     branches: [main]
+  # 加手动触发入口，便于失败后手动重跑而不必再推一次 outbound-workbench
+  workflow_dispatch:
+
+# 关键：限并发——GitHub Pages 同仓库不能并发部署，
+# 否则 inbound 推一次 outbound-workbench 就会卡住 Pages。
+# group 跨 workflow 复用，保证 deploy 完才进下一个 sync。
+concurrency:
+  group: pages-deploy-${{ github.repository }}
+  cancel-in-progress: false
 
 jobs:
   sync:
@@ -21,9 +30,21 @@ jobs:
 
       - name: Sync files
         run: |
+          # 关键修复①：cd 到 $GITHUB_WORKSPACE 根，rsync 源 = outbound-workbench 工作树
+          cd "$GITHUB_WORKSPACE"
           rm -rf monthly-report/outbound-workbench
           mkdir -p monthly-report/outbound-workbench
-          rsync -av --exclude .git --exclude .github . monthly-report/outbound-workbench/
+          rsync -av \
+            --exclude .git \
+            --exclude .github \
+            --exclude .nojekyll \
+            --exclude monthly-report \
+            --exclude '*.mp4' \
+            --exclude '*.mov' \
+            --exclude '*.zip' \
+            --exclude '*.tar.gz' \
+            ./ monthly-report/outbound-workbench/
+          echo "✅ rsync 完成：$(du -sh monthly-report/outbound-workbench | cut -f1)"
 
       - name: Commit and push
         run: |
