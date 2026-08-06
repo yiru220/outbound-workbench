@@ -381,6 +381,14 @@
     box-sizing: border-box; font-family: inherit; resize: vertical;
   }
   .call-panel .extra-field.extra-remark { grid-column: 1 / -1; margin-top: 4px; }
+  /* 省/市「自动识别」小按钮 */
+  .call-panel .extra-field .mini-btn {
+    margin-top: 6px; width: 100%; padding: 6px 8px; font-size: 12px;
+    border: 1px dashed var(--border); background: #f8f9fa; color: var(--primary);
+    border-radius: 8px; cursor: pointer; transition: background .15s, border-color .15s;
+  }
+  .call-panel .extra-field .mini-btn:hover:not(:disabled) { background: var(--primary-light); border-color: var(--primary); }
+  .call-panel .extra-field .mini-btn:disabled { opacity: .5; cursor: not-allowed; }
   .call-panel .sync-btn {
     width: 100%; margin-top: 12px; padding: 11px; font-size: 14px; font-weight: 600;
     color: #fff; background: var(--primary); border: none; border-radius: 10px; cursor: pointer;
@@ -590,7 +598,7 @@ const WEBHOOK_FIELDS = {
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-06c';
+const APP_VERSION = '2026-08-06d';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -2182,8 +2190,9 @@ function renderMain() {
                 </select>
               </div>
               <div class="extra-field">
-                <label>省</label>
+                <label>省（可参考手机号归属地）</label>
                 <select id="exProvince" ${synced ? 'disabled' : ''} onchange="saveExtra('province',this.value)"></select>
+                <button type="button" class="mini-btn" ${synced ? 'disabled' : ''} onclick="autoFillRegion(true)">📍 自动识别</button>
               </div>
               <div class="extra-field">
                 <label>市</label>
@@ -2274,6 +2283,47 @@ function initExtraFields(l) {
   set('exInviteGroup', ex.inviteGroup);
   set('exAge', ex.age);
   set('exRemark', ex.remark);
+  // 省/市：若未回传且省为空，打开线索时自动按手机号归属地预填（不覆盖已填值）
+  if (!syncedLeads[l.record_id]) autoFillRegion(false);
+}
+
+// 手机号归属地 → 省/市 自动识别
+function normalizeProvince(raw) {
+  if (!raw) return '';
+  let p = String(raw).trim().replace(/(省|市|壮族自治区|回族自治区|维吾尔自治区|自治区|特别行政区)$/g, '');
+  if (PROVINCES.includes(p)) return p;
+  return '其他';
+}
+async function autoFillRegion(force) {
+  const l = selectedLead;
+  if (!l) return;
+  if (syncedLeads[l.record_id]) return;  // 已回传不可改
+  const phone = String(l.phone || '').replace(/\D/g, '');
+  if (phone.length < 7) { if (force) toast('手机号位数不足，无法识别归属地'); return; }
+  const provEl = document.getElementById('exProvince');
+  const cityEl = document.getElementById('exCity');
+  if (!force && provEl && provEl.value) return;  // 非强制模式：已填省则不覆盖
+  const proxy = getProxyUrl() || WEBHOOK_PROXY_URL;
+  if (!proxy) { if (force) toast('未配置上传代理，无法自动识别归属地'); return; }
+  const btn = document.querySelector('.mini-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '识别中…'; }
+  try {
+    const url = proxy.replace(/\/$/, '') + '/phone-region?number=' + encodeURIComponent(phone);
+    const r = await fetch(url);
+    const j = await r.json().catch(() => ({}));
+    if (j && j.province) {
+      const prov = normalizeProvince(j.province);
+      if (provEl) { provEl.value = prov; saveExtra('province', prov); }
+      if (j.city && cityEl && !cityEl.value) { cityEl.value = j.city; saveExtra('city', j.city); }
+      if (force) toast('已识别：' + prov + (j.city ? (' · ' + j.city) : '') + (j.sp ? ('（' + j.sp + '）') : ''), 'success');
+    } else if (force) {
+      toast('未能识别归属地：' + (j.error || '无结果'));
+    }
+  } catch (e) {
+    if (force) toast('识别失败：' + e.message);
+  } finally {
+    if (btn) { btn.disabled = !!syncedLeads[l.record_id]; btn.textContent = '📍 自动识别'; }
+  }
 }
 // 回传时间：目标表为日期类型，年月日格式 YYYY-MM-DD
 function fmtDate(d) {
