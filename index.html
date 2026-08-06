@@ -600,15 +600,18 @@ const RECORDINGS_PATH = 'recordings';
 
 // ========== Webhook：回传客户补充信息到企微智能表格 ==========
 const WEBHOOK_URL = 'https://qyapi.weixin.qq.com/cgi-bin/wedoc/smartsheet/webhook?key=13q3vpbak4k1uyFxoToaopH15jRjtaPaQ3LH74X7z3KRp7nLRZlCUVGk1T8OJc6AWGfXV3uIfbqfMb3t1ExEov1MaCgqwFX2dQHTShxleZ2r';
-// 回传代理地址（Cloudflare Worker，用于绕过浏览器跨域）。已内置并部署，全员免配置立即生效。
-const WEBHOOK_PROXY_URL = 'https://outbound-webhook-proxy.yiru220.workers.dev';
+// 统一代理地址（腾讯云 CloudBase HTTP 云函数，国内直连，手机 4G/5G 均可访问）。
+// 2026-08-06 由 Cloudflare Worker 迁移而来：workers.dev 在国内网络不可达，导致手机端上传/转写失败。
+const WORKER_BASE = 'https://outbound-workbench-d4cvc6699512f-1460194202.ap-shanghai.app.tcloudbase.com/api';
 
-// GitHub 上传统一走 Cloudflare Worker 代理（同一个 Worker 的 /github 路由）。
-// Token 由 Worker 持有（Cloudflare Secret），前端不存放，全员免配置即可上传。
-const WORKER_BASE = 'https://outbound-webhook-proxy.yiru220.workers.dev';
+// 回传代理地址（绕过浏览器跨域）。已内置并部署，全员免配置立即生效。
+const WEBHOOK_PROXY_URL = WORKER_BASE;
+
+// GitHub 上传统一走代理的 /github 路由。
+// Token 由服务端持有（CloudBase 环境变量），前端不存放，全员免配置即可上传。
 const GITHUB_PROXY_URL = WORKER_BASE + '/github';
-// 录音转写 + AI 分析代理（同一个 Worker 的 /transcribe 路由）。
-// 后端优先级（免费优先，Worker 内自动回退）：硅基流动 → Cloudflare Workers AI → OpenAI。
+// 录音转写 + AI 分析代理（同一服务的 /transcribe 路由）。
+// 后端优先级（免费优先，服务端自动回退）：硅基流动 → OpenAI。
 const TRANSCRIBE_PROXY_URL = WORKER_BASE + '/transcribe';
 
 // 把 GitHub blob 页链接转为 raw 直链（用于浏览器播放与 Worker 拉取音频）。
@@ -637,7 +640,7 @@ const WEBHOOK_FIELDS = {
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-06o';
+const APP_VERSION = '2026-08-06p';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
