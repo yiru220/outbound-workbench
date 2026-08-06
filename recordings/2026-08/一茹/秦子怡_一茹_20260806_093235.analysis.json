@@ -1,0 +1,43 @@
+{
+  "transcript": "你好你好你好你好你好你好你好。",
+  "score": 45,
+  "dimensions": [
+    {
+      "name": "开场破冰",
+      "score": 5
+    },
+    {
+      "name": "需求挖掘",
+      "score": 4
+    },
+    {
+      "name": "异议处理",
+      "score": 3
+    },
+    {
+      "name": "成交引导",
+      "score": 4
+    },
+    {
+      "name": "专业度",
+      "score": 5
+    }
+  ],
+  "strengths": [
+    "开场有礼貌",
+    "语速较快",
+    "有主动问候"
+  ],
+  "weaknesses": [
+    "开场重复过多影响专业性",
+    "未有效引导对话",
+    "缺乏需求挖掘技巧",
+    "未处理客户异议"
+  ],
+  "summary": "通话内容较为简短，缺乏有效沟通和专业表现。",
+  "provider_label": "硅基流动（免费）",
+  "asr_model": "FunAudioLLM/SenseVoiceSmall",
+  "llm_model": "Qwen/Qwen3-8B",
+  "analysis_error": "",
+  "analyzed_at": "2026-08-06T01:33:14.668Z"
+}
