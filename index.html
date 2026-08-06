@@ -640,7 +640,7 @@ const WEBHOOK_FIELDS = {
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-06p';
+const APP_VERSION = '2026-08-06q';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -2592,7 +2592,9 @@ async function transcribeCall(callId) {
   const btn = document.getElementById('txbtn-' + callId);
   const statusEl = document.getElementById('txstatus-' + callId);
   const raw = rawUrlOf(call);
-  const audio = (!raw && call.audio_data) ? call.audio_data : null;
+  // 本机若还留有录音原始数据，优先直传（最快最稳）；
+  // 服务端在国内，去 raw.githubusercontent.com 拉音频可能不通，能不绕就不绕。
+  const audio = call.audio_data && String(call.audio_data).startsWith('data:') ? call.audio_data : null;
   if (!raw && !audio) {
     if (statusEl) statusEl.innerHTML = '<span style="color:var(--danger)">无可分析音频</span>';
     return;
@@ -2603,9 +2605,9 @@ async function transcribeCall(callId) {
     const resp = await fetch(TRANSCRIBE_PROXY_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(raw
-        ? { url: raw, name: (call.github_path || 'audio.webm').split('/').pop() }
-        : { audio: audio, name: 'audio.webm' }),
+      body: JSON.stringify(audio
+        ? { audio: audio, name: (call.github_path || 'audio.webm').split('/').pop() }
+        : { url: raw, name: (call.github_path || 'audio.webm').split('/').pop() }),
     });
     const j = await resp.json().catch(() => ({}));
     if (!resp.ok || j.error) throw new Error(j.error || ('HTTP ' + resp.status));
