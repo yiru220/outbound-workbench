@@ -637,7 +637,7 @@ const WEBHOOK_FIELDS = {
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-06m';
+const APP_VERSION = '2026-08-06n';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -2351,11 +2351,15 @@ async function autoFillRegion(force) {
   if (!force && provEl && provEl.value) return;  // 非强制模式：已填省则不覆盖
   const proxy = getProxyUrl() || WEBHOOK_PROXY_URL;
   if (!proxy) { if (force) toast('未配置上传代理，无法自动识别归属地'); return; }
-  const btn = document.querySelector('.mini-btn');
+  // 仅手动点击时改变按钮状态；自动预填不打扰 UI（避免手机端请求挂起卡死按钮）
+  const btn = force ? document.querySelector('.mini-btn') : null;
   if (btn) { btn.disabled = true; btn.textContent = '识别中…'; }
   try {
     const url = proxy.replace(/\/$/, '') + '/phone-region?number=' + encodeURIComponent(phone);
-    const r = await fetch(url);
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);  // 8 秒超时，避免手机端挂起卡死
+    const r = await fetch(url, { signal: ctrl.signal });
+    clearTimeout(timer);
     const j = await r.json().catch(() => ({}));
     if (j && j.province) {
       const prov = normalizeProvince(j.province);
@@ -2366,7 +2370,7 @@ async function autoFillRegion(force) {
       toast('未能识别归属地：' + (j.error || '无结果'));
     }
   } catch (e) {
-    if (force) toast('识别失败：' + e.message);
+    if (force) toast('识别失败：' + (e.name === 'AbortError' ? '网络超时' : e.message));
   } finally {
     if (btn) { btn.disabled = !!syncedLeads[l.record_id]; btn.textContent = '📍 自动识别'; }
   }
