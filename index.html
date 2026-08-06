@@ -637,7 +637,7 @@ const WEBHOOK_FIELDS = {
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-06n';
+const APP_VERSION = '2026-08-06o';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -2782,7 +2782,7 @@ function saveAndUpload() {
   if (uploadArea) {
     uploadArea.innerHTML = `
       <div class="upload-bar"><div class="fill" id="uploadFill"></div></div>
-      <div class="upload-status uploading" id="uploadStatus">⏳ 正在上传到 GitHub...</div>`;
+      <div class="upload-status uploading" id="uploadStatus">⏳ 正在上传到 Kangxiaohu知识库...</div>`;
   }
 
   const reader = new FileReader();
@@ -2859,7 +2859,7 @@ function updateUploadUI(status, msg) {
   if (status === 'uploading') {
     fill.style.width = '50%';
     statusEl.className = 'upload-status uploading';
-    statusEl.textContent = '⏳ 正在上传到 GitHub...';
+    statusEl.textContent = '⏳ 正在上传到 Kangxiaohu知识库...';
   } else if (status === 'success') {
     fill.style.width = '100%';
     statusEl.className = 'upload-status success';
@@ -2944,7 +2944,7 @@ async function uploadToGitHub(call, dataUrl) {
 
   updateStats();
   updateUploadUI('success', `已上传 → ${filePath}`);
-  toast(`✅ 录音已自动上传到 GitHub`, 'success');
+  toast(`✅ 录音已自动上传到 Kangxiaohu知识库`, 'success');
 
   refreshAfterCallChange();  // 切换音频源为 GitHub 链接 / 或刷新历史页
 }
