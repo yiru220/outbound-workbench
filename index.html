@@ -2339,7 +2339,7 @@ async function syncLeadExtra() {
       if (maxScore === null || c.analysis.score > maxScore) maxScore = c.analysis.score;
     }
   }
-  if (maxScore !== null) values[F.score] = [{ type: 'number', number: maxScore }];
+  if (maxScore !== null) values[F.score] = maxScore;  // 数字型字段：单元格值为 double，直接传标量数字（不能包数组，否则报 2022017）
   const payload = { add_records: [ { values: values } ] };
   const btn = document.getElementById('syncBtn');
   const st = document.getElementById('syncStatus');
