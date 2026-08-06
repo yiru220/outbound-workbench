@@ -1,0 +1,42 @@
+{
+  "transcript": "babybababa,ba,你在吗？baby baby,我的小baby.",
+  "score": 45,
+  "dimensions": [
+    {
+      "name": "开场破冰",
+      "score": 5
+    },
+    {
+      "name": "需求挖掘",
+      "score": 4
+    },
+    {
+      "name": "异议处理",
+      "score": 3
+    },
+    {
+      "name": "成交引导",
+      "score": 4
+    },
+    {
+      "name": "专业度",
+      "score": 5
+    }
+  ],
+  "strengths": [
+    "开场亲切，有亲和力",
+    "语速适中，表达清晰"
+  ],
+  "weaknesses": [
+    "开场过于随意，缺乏专业感",
+    "未有效挖掘客户需求",
+    "未处理客户异议",
+    "成交引导不够明确"
+  ],
+  "summary": "整体通话质量较低，缺乏专业性和客户需求挖掘，需加强沟通技巧和销售流程规范。",
+  "provider_label": "硅基流动（免费）",
+  "asr_model": "FunAudioLLM/SenseVoiceSmall",
+  "llm_model": "Qwen/Qwen3-8B",
+  "analysis_error": "",
+  "analyzed_at": "2026-08-06T07:45:54.770Z"
+}
