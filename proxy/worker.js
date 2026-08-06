@@ -23,7 +23,7 @@ const GITHUB_BRANCH = 'main';
 
 // Worker 代码版本。改动代码时同步 +1，方便判断 Cloudflare 是否已部署最新版。
 // 自检：浏览器直接打开 https://outbound-webhook-proxy.yiru220.workers.dev/health
-const WORKER_VERSION = '2026-08-05d-delete';
+const WORKER_VERSION = '2026-08-06d-phone-region';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -57,6 +57,12 @@ export default {
       return new Response('Method Not Allowed', { status: 405, headers: CORS });
     }
 
+    // 手机号归属地查询（GET）：/phone-region?number=13800138000 → { province, city, sp }
+    // 代理 360 公开接口，解决浏览器跨域；用于前端「根据手机号自动识别省/市」。
+    if (url.pathname === '/phone-region') {
+      return handlePhoneRegion(url);
+    }
+
     // /github 走 GitHub 上传代理；/transcribe 走录音转写+AI 分析；其余走企微 webhook 代理
     if (url.pathname === '/github') {
       return handleGitHub(request, env);
@@ -87,6 +93,27 @@ async function handleWebhook(request) {
       JSON.stringify({ errcode: -1, errmsg: 'proxy error: ' + e.message }),
       { status: 502, headers: { 'Content-Type': 'application/json; charset=utf-8', ...CORS } }
     );
+  }
+}
+
+// ---------- 手机号归属地查询代理（360 公开接口） ----------
+async function handlePhoneRegion(url) {
+  const num = (url.searchParams.get('number') || '').replace(/\D/g, '');
+  if (!num || num.length < 7) {
+    return json({ error: '请输入至少 7 位手机号' }, 400);
+  }
+  try {
+    const upstream = await fetch('https://cx.shouji.360.cn/phonearea.php?number=' + encodeURIComponent(num));
+    if (!upstream.ok) return json({ error: '归属地查询失败: HTTP ' + upstream.status }, 502);
+    const j = await upstream.json();
+    if (!j || j.code !== 0 || !j.data) return json({ error: '归属地查询无结果' }, 404);
+    return json({
+      province: j.data.province || '',
+      city: j.data.city || '',
+      sp: j.data.sp || '',
+    });
+  } catch (e) {
+    return json({ error: '归属地查询异常: ' + e.message }, 502);
   }
 }
 
