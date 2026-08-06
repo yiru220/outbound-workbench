@@ -53,14 +53,15 @@ export default {
       });
     }
 
-    if (request.method !== 'POST') {
-      return new Response('Method Not Allowed', { status: 405, headers: CORS });
-    }
-
     // 手机号归属地查询（GET）：/phone-region?number=13800138000 → { province, city, sp }
     // 代理 360 公开接口，解决浏览器跨域；用于前端「根据手机号自动识别省/市」。
+    // 必须放在 POST 方法检查之前（该接口本身是 GET）。
     if (url.pathname === '/phone-region') {
       return handlePhoneRegion(url);
+    }
+
+    if (request.method !== 'POST') {
+      return new Response('Method Not Allowed', { status: 405, headers: CORS });
     }
 
     // /github 走 GitHub 上传代理；/transcribe 走录音转写+AI 分析；其余走企微 webhook 代理
