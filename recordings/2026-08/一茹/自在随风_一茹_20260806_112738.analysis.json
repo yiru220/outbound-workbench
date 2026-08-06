@@ -1,0 +1,41 @@
+{
+  "transcript": "啊，哼你好，老板什么什么什么什么什么什么。",
+  "score": 45,
+  "dimensions": [
+    {
+      "name": "开场破冰",
+      "score": 5
+    },
+    {
+      "name": "需求挖掘",
+      "score": 4
+    },
+    {
+      "name": "异议处理",
+      "score": 3
+    },
+    {
+      "name": "成交引导",
+      "score": 4
+    },
+    {
+      "name": "专业度",
+      "score": 5
+    }
+  ],
+  "strengths": [
+    "开场礼貌",
+    "语速适中"
+  ],
+  "weaknesses": [
+    "话术不清晰",
+    "缺乏产品介绍",
+    "未明确客户需求"
+  ],
+  "summary": "通话内容混乱，缺乏专业性和针对性，需加强话术训练和客户需求挖掘能力。",
+  "provider_label": "硅基流动（免费）",
+  "asr_model": "FunAudioLLM/SenseVoiceSmall",
+  "llm_model": "Qwen/Qwen3-8B",
+  "analysis_error": "",
+  "analyzed_at": "2026-08-06T03:28:42.629Z"
+}
