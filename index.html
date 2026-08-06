@@ -642,7 +642,7 @@ const WEBHOOK_FIELDS = {
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-06s';
+const APP_VERSION = '2026-08-06t';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -1875,6 +1875,10 @@ function ownerChipDetail(l) {
 
 // ========== Init ==========
 function init() {
+  // 版本强刷：仓库 version.json 与本地 APP_VERSION 不一致时，强制刷新到最新代码。
+  // 解决手机端浏览器缓存旧 HTML 导致「跨设备已回传状态」等功能不生效的问题。
+  checkVersionReload();
+
   // 一次性清空测试数据（2026-08-05g）：此前所有录音与回传均为测试数据，全部清除。
   // 仅每个浏览器首次加载时执行一次（按 RESET_VERSION 判定），服务器文件已另行删除。
   const RESET_VERSION = '2026-08-05g-clear-test';
@@ -1968,15 +1972,34 @@ async function restoreReturned() {
   } catch (e) { /* 离线 / 接口异常不影响本地使用 */ }
 }
 
-// 回传成功后把「已回传」状态同步到云端，供其他设备读取。
+// 回传成功后把「已回传」状态同步到云端，供其他设备读取。失败自动重试一次。
 async function syncReturnedToCloud(recordId, date) {
+  const body = JSON.stringify({ record_id: recordId, date: date });
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const r = await fetch(RETURNED_PROXY_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+      });
+      if (r.ok) return;
+    } catch (e) { /* 重试 */ }
+  }
+}
+
+// 版本强刷：比对仓库 version.json 与本地版本，不一致则强制刷新（绕过浏览器缓存）。
+// 仅当能成功读到远端版本且与本地不同才刷新，避免离线/接口异常时死循环刷新。
+async function checkVersionReload() {
+  if (sessionStorage.getItem('outbound_version_reloaded') === APP_VERSION) return; // 本会话已因版本刷新过，避免反复跳
   try {
-    await fetch(RETURNED_PROXY_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ record_id: recordId, date: date }),
-    });
-  } catch (e) { /* 失败不影响本地已回传标记 */ }
+    const r = await fetch('./version.json?_=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) return;
+    const j = await r.json();
+    if (j && j.version && j.version !== APP_VERSION) {
+      sessionStorage.setItem('outbound_version_reloaded', j.version);
+      location.reload(true);  // 强制绕过缓存重新加载最新 HTML
+    }
+  } catch (e) { /* 离线/异常不刷新，照常使用 */ }
 }
 
 // 客户列表加载：优先每日同步的 leads.json，失败回退内置快照 REAL_LEADS。
@@ -2429,6 +2452,22 @@ async function syncLeadExtra() {
   if (!selectedLead) return;
   const l = selectedLead;
   if (syncedLeads[l.record_id]) { toast('该客户已回传，无需重复回传'); return; }
+  // 云端实时去重：即使本机状态丢失（清缓存/换设备未恢复/旧版缓存），也避免向回执表重复写入。
+  // 这是独立于「按钮禁用」的第二道防线——点回传前先查云端 returned.json。
+  try {
+    const r = await fetch(RETURNED_PROXY_URL + '?_=' + Date.now(), { cache: 'no-store' });
+    if (r.ok) {
+      const cloud = await r.json();
+      if (cloud && cloud[l.record_id]) {
+        syncedLeads[l.record_id] = cloud[l.record_id];
+        leadReached[l.record_id] = true;
+        try { localStorage.setItem('outbound_synced', JSON.stringify(syncedLeads)); } catch(e){}
+        try { localStorage.setItem('outbound_reached', JSON.stringify(leadReached)); } catch(e){}
+        renderMain();
+        toast('该客户已在回执表中，无需重复回传'); return;
+      }
+    }
+  } catch(e) { /* 查不到云端时继续走本地逻辑，不阻断回传 */ }
   const phone = (l.phone || '').trim();
   if (!phone) { toast('该线索没有手机号，无法回传'); return; }
   const name = (l.name || l.account_name || '').trim();
