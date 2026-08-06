@@ -1,0 +1,42 @@
+{
+  "transcript": "Hello, baby, hello, baby.",
+  "score": 45,
+  "dimensions": [
+    {
+      "name": "开场破冰",
+      "score": 5
+    },
+    {
+      "name": "需求挖掘",
+      "score": 4
+    },
+    {
+      "name": "异议处理",
+      "score": 3
+    },
+    {
+      "name": "成交引导",
+      "score": 4
+    },
+    {
+      "name": "专业度",
+      "score": 5
+    }
+  ],
+  "strengths": [
+    "开场语气亲切",
+    "有主动问候"
+  ],
+  "weaknesses": [
+    "称呼不专业，使用'baby'不合适",
+    "未明确说明来电目的",
+    "缺乏产品价值介绍",
+    "未处理客户异议"
+  ],
+  "summary": "整体通话质量较低，需提升专业性和沟通技巧。",
+  "provider_label": "硅基流动（免费）",
+  "asr_model": "FunAudioLLM/SenseVoiceSmall",
+  "llm_model": "Qwen/Qwen3-8B",
+  "analysis_error": "",
+  "analyzed_at": "2026-08-06T07:42:57.963Z"
+}
