@@ -594,12 +594,13 @@ const WEBHOOK_FIELDS = {
   age:      'faUSXZ',   // 年龄（根据声音估计）(单选：30以下/30-40/40-50/50-60/60以上)
   remark:   'fXGIQi',   // 备注 (文本)
   score:    'fIAeZQ',   // 通话评分 (数字：取该客户多段录音最高分)
+  evaluation: 'fe5eon', // 通话评价 (文本：取最高分那段录音的总体点评 summary)
   phone:    'fuvsCp',   // 手机号 (文本)
   date:     'fEDPIZ'    // 回传日期 (日期时间)
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-06a';
+const APP_VERSION = '2026-08-06b';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -2330,16 +2331,22 @@ async function syncLeadExtra() {
   const phoneDigits = String(phone).replace(/\D/g, '');
   if (phoneDigits) values[F.phone] = [{ type: 'text', text: phoneDigits }];
   values[F.date] = timeStr;  // 回传日期：年月日格式，写入当天日期
-  // 通话评分：该客户多段录音取最高分（数字型字段）
+  // 通话评分 / 通话评价：该客户多段录音取最高分那段，评分写数字、评价写其总体点评 summary（文本）
   let maxScore = null;
+  let bestSummary = '';
   for (const c of calls) {
     const match = (phone && c.lead_phone === phone) || (name && c.lead_name === name);
     if (!match) continue;
-    if (c.analysis && typeof c.analysis.score === 'number') {
-      if (maxScore === null || c.analysis.score > maxScore) maxScore = c.analysis.score;
+    const a = c.analysis;
+    if (!a) continue;
+    if (typeof a.score === 'number' && (maxScore === null || a.score > maxScore)) {
+      maxScore = a.score;
+      if (a.summary) bestSummary = a.summary;
     }
+    if (!bestSummary && a.summary) bestSummary = a.summary;  // 兜底：无评分但有评价文字
   }
   if (maxScore !== null) values[F.score] = maxScore;  // 数字型字段：单元格值为 double，直接传标量数字（不能包数组，否则报 2022017）
+  if (bestSummary) values[F.evaluation] = [{ type: 'text', text: bestSummary }];  // 文本字段：按文本格式发送
   const payload = { add_records: [ { values: values } ] };
   const btn = document.getElementById('syncBtn');
   const st = document.getElementById('syncStatus');
@@ -2358,7 +2365,7 @@ async function syncLeadExtra() {
     if (ok) {
       st.style.color = 'green';
       st.textContent = '✅ 回传成功 · ' + timeStr;
-      toast('客户信息已回传智能表格' + (maxScore !== null ? (' · 通话评分 ' + maxScore) : ''), 'success');
+      toast('客户信息已回传智能表格' + (maxScore !== null ? (' · 通话评分 ' + maxScore) : '') + (bestSummary ? ' · 通话评价已写入' : ''), 'success');
       // 标记为已回传，禁用重复回传
       syncedLeads[l.record_id] = timeStr;
       try { localStorage.setItem('outbound_synced', JSON.stringify(syncedLeads)); } catch(e) {}
