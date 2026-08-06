@@ -1,0 +1,42 @@
+{
+  "transcript": "hello宝贝 hello宝贝 hello宝贝 hello宝贝。😊",
+  "score": 45,
+  "dimensions": [
+    {
+      "name": "开场破冰",
+      "score": 5
+    },
+    {
+      "name": "需求挖掘",
+      "score": 4
+    },
+    {
+      "name": "异议处理",
+      "score": 3
+    },
+    {
+      "name": "成交引导",
+      "score": 4
+    },
+    {
+      "name": "专业度",
+      "score": 5
+    }
+  ],
+  "strengths": [
+    "语气亲切，有亲和力",
+    "使用表情符号增加亲切感"
+  ],
+  "weaknesses": [
+    "开场重复过多，显得不专业",
+    "未提及产品或服务内容",
+    "缺乏明确的沟通目标",
+    "未引导客户进入下一步沟通"
+  ],
+  "summary": "开场过于随意，缺乏专业性和明确沟通目标，需提升整体话术结构与内容针对性。",
+  "provider_label": "硅基流动（免费）",
+  "asr_model": "FunAudioLLM/SenseVoiceSmall",
+  "llm_model": "Qwen/Qwen3-8B",
+  "analysis_error": "",
+  "analyzed_at": "2026-08-06T07:43:37.006Z"
+}
