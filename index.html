@@ -607,9 +607,10 @@ const WORKER_BASE = 'https://outbound-workbench-d4cvc6699512f-1460194202.ap-shan
 // 回传代理地址（绕过浏览器跨域）。已内置并部署，全员免配置立即生效。
 const WEBHOOK_PROXY_URL = WORKER_BASE;
 
-// GitHub 上传统一走代理的 /github 路由。
-// Token 由服务端持有（CloudBase 环境变量），前端不存放，全员免配置即可上传。
+// GitHub 上传统一走代理的 /github 路由（仅保留兼容，主存储已切到 /upload 云存储）。
 const GITHUB_PROXY_URL = WORKER_BASE + '/github';
+// 录音/分析文件主存储：CloudBase 云存储（经代理的 /upload 路由，不再传 GitHub）。
+const UPLOAD_PROXY_URL = WORKER_BASE + '/upload';
 // 录音转写 + AI 分析代理（同一服务的 /transcribe 路由）。
 // 后端优先级（免费优先，服务端自动回退）：硅基流动 → OpenAI。
 const TRANSCRIBE_PROXY_URL = WORKER_BASE + '/transcribe';
@@ -642,7 +643,7 @@ const WEBHOOK_FIELDS = {
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-06t';
+const APP_VERSION = '2026-08-06u';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -2690,7 +2691,9 @@ async function transcribeCall(callId) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(audio
         ? { audio: audio, name: (call.github_path || 'audio.webm').split('/').pop() }
-        : { url: raw, name: (call.github_path || 'audio.webm').split('/').pop() }),
+        : (call.cloud_file_id
+            ? { fileID: call.cloud_file_id, name: (call.github_path || 'audio.webm').split('/').pop() }
+            : { url: raw, name: (call.github_path || 'audio.webm').split('/').pop() })),
     });
     const j = await resp.json().catch(() => ({}));
     if (!resp.ok || j.error) throw new Error(j.error || ('HTTP ' + resp.status));
@@ -2714,8 +2717,9 @@ async function transcribeCall(callId) {
     if (call.github_path) {
       try {
         const apath = call.github_path.replace(/\.webm$/i, '.analysis.json');
-        await uploadTextToGitHub(apath, JSON.stringify(call.analysis, null, 2),
+        const r = await uploadTextToGitHub(apath, JSON.stringify(call.analysis, null, 2),
           `📊 录音分析: ${call.lead_name || ''} ${call.started_at || ''}`);
+        if (r && r.fileID) { call.cloud_analysis_file_id = r.fileID; call.cloud_analysis_url = r.url || ''; updateCallInStorage(call); }
       } catch (e) { console.warn('分析 JSON 同步失败(不影响本地):', e); }
     }
     if (btn) { btn.disabled = false; btn.textContent = '🔄 重新分析'; }
@@ -2741,14 +2745,14 @@ async function transcribeCall(callId) {
   }
 }
 
-// 把文本（UTF-8 安全）推到 GitHub（复用上传代理）
+// 把文本（UTF-8 安全）上传到 CloudBase 云存储（替代 GitHub）
 async function uploadTextToGitHub(path, text, message) {
-  if (!GITHUB_PROXY_URL) throw new Error('上传代理未配置');
+  if (!UPLOAD_PROXY_URL) throw new Error('上传代理未配置');
   const content = btoa(unescape(encodeURIComponent(text)));
-  const resp = await fetch(GITHUB_PROXY_URL, {
+  const resp = await fetch(UPLOAD_PROXY_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ path, content, message, branch: GITHUB_BRANCH }),
+    body: JSON.stringify({ cloudPath: path, content }),
   });
   if (!resp.ok) {
     const e = await resp.json().catch(() => ({}));
@@ -2766,9 +2770,11 @@ async function autoLoadAnalyses(l) {
     (phone && c.lead_phone === phone) || (name && c.lead_name === name));
   for (const c of list) {
     if (c.analysis && (c.analysis.score != null || c.analysis.transcript)) continue;
-    const raw = rawUrlOf(c);
-    if (!raw) continue;
-    const aurl = raw.replace(/\.webm$/i, '.analysis.json');
+    const aurl = c.cloud_analysis_url || (() => {
+      const raw = rawUrlOf(c);
+      return raw ? raw.replace(/\.webm$/i, '.analysis.json') : null;
+    })();
+    if (!aurl) continue;
     try {
       const r = await fetch(aurl);
       if (!r.ok) continue;
@@ -2889,6 +2895,10 @@ function saveAndUpload() {
       created: Date.now(),
       uploaded: false,
       github_url: null,
+      cloud_file_id: null,
+      cloud_path: null,
+      cloud_analysis_file_id: null,
+      cloud_analysis_url: null,
       upload_error: null,
     };
     calls.push(call);
@@ -2982,51 +2992,30 @@ async function uploadToGitHub(call, dataUrl) {
 
   updateUploadUI('uploading');
 
-  // 统一通过 Cloudflare Worker 代理上传（Token 由 Worker 持有，前端不存放，全员免配置）。
-  // 若代理地址为空，则回退为带 Token 的直连（选填兜底）。
+  // 统一通过 CloudBase 代理上传到云存储（/upload 路由），Token 由代理持有，前端不存放，全员免配置。
   const message = `📞 外呼录音: ${call.lead_name} | ${call.user_name} | ${call.started_at}`;
-  let resp;
-  if (GITHUB_PROXY_URL) {
-    resp = await fetch(GITHUB_PROXY_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        path: filePath,
-        content: base64Content,
-        message: message,
-        branch: GITHUB_BRANCH,
-      }),
-    });
-  } else {
-    const token = getGHToken();
-    if (!token) throw new Error('未配置 GitHub Token（且上传代理未启用）');
-    resp = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${filePath}`, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/vnd.github.v3+json',
-      },
-      body: JSON.stringify({ message, content: base64Content, branch: GITHUB_BRANCH }),
-    });
-  }
+  const resp = await fetch(UPLOAD_PROXY_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cloudPath: filePath, content: base64Content }),
+  });
 
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({}));
-    if (resp.status === 401) throw new Error('上传代理 Token 未配置或无效，请联系管理员设置 Cloudflare Secret GITHUB_TOKEN');
-    if (resp.status === 403) throw new Error('Token 权限不足，需要 contents:write 权限');
-    if (resp.status === 409) throw new Error('文件已存在: ' + filePath);
-    throw new Error(err.message || `上传失败 (HTTP ${resp.status})`);
+    throw new Error(err.error || ('上传失败 (HTTP ' + resp.status + ')'));
   }
 
   const result = await resp.json();
-  const githubUrl = result.content.html_url || result.content.url;
+  const cloudUrl = result.url || '';
+  const cloudFileId = result.fileID || '';
 
-  // Update call record
+  // Update call record（cloud_ 为主存储，github_ 为兼容别名）
   call.uploaded = true;
-  call.github_url = githubUrl;
-  call.github_raw = rawUrlOf({ github_url: githubUrl });
+  call.github_url = cloudUrl;
+  call.github_raw = cloudUrl;
   call.github_path = filePath;
+  call.cloud_file_id = cloudFileId;
+  call.cloud_path = filePath;
   call.upload_error = null;
   updateCallInStorage(call);
 
@@ -3093,21 +3082,21 @@ function downloadAudio(callId) {
 async function deleteCall(callId) {
   const call = calls.find(c => c.call_id === callId);
   if (!call) return;
-  if (!confirm('确定删除这条录音？将从本地与服务器（GitHub 仓库）一并删除，不可恢复。')) return;
+  if (!confirm('确定删除这条录音？将从本地与云存储（Kangxiaohu 服务器）一并删除，不可恢复。')) return;
 
   // 1) 本地删除
   calls = calls.filter(c => c.call_id !== callId);
   try { localStorage.setItem('outbound_calls', JSON.stringify(calls)); } catch (e) {}
   updateStats();
 
-  // 2) 服务器删除（录音 + 分析 JSON 兄弟文件）；任一处失败仅提示，不影响本地删除
+  // 2) 服务器删除（云存储：录音 + 分析 JSON）；任一处失败仅提示，不影响本地删除
   let serverOk = true, serverMsg = '';
-  if (call.github_path) {
-    const paths = [call.github_path, call.github_path.replace(/\.webm$/i, '.analysis.json')];
-    for (const p of paths) {
-      try { await deleteGitHubFile(p); }
-      catch (e) { serverOk = false; serverMsg = e.message; }
-    }
+  const cloudIds = [];
+  if (call.cloud_file_id) cloudIds.push(call.cloud_file_id);
+  if (call.cloud_analysis_file_id) cloudIds.push(call.cloud_analysis_file_id);
+  for (const id of cloudIds) {
+    try { await deleteCloudFile(id); }
+    catch (e) { serverOk = false; serverMsg = e.message; }
   }
 
   refreshAfterCallChange();
@@ -3115,37 +3104,19 @@ async function deleteCall(callId) {
   else toast('本地已删除；服务器删除失败：' + (serverMsg || '未知错误') + '（可能 Worker 未更新或文件已不存在）', 'error');
 }
 
-// 通过 Worker 代理（或前端 token 兜底）删除 GitHub 仓库中的文件；404 视为已删除
-async function deleteGitHubFile(path) {
-  const message = '🗑️ 删除录音: ' + path;
-  const target = getProxyUrl() || GITHUB_PROXY_URL;
-  if (target) {
-    const resp = await fetch(target, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'delete', path, message, branch: GITHUB_BRANCH }),
-    });
-    if (resp.status === 404) return;
-    if (!resp.ok) {
-      const j = await resp.json().catch(() => ({}));
-      throw new Error(j.error || ('HTTP ' + resp.status));
-    }
-    return;
-  }
-  const token = getGHToken();
-  if (!token) throw new Error('未配置上传代理或 GitHub Token');
-  const apiUrl = `https://api.github.com/repos/${GITHUB_REPO}/contents/${path}`;
-  const h = { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.v3+json' };
-  const g = await fetch(apiUrl, { headers: h });
-  if (g.status === 404) return;
-  if (!g.ok) throw new Error('获取文件失败 HTTP ' + g.status);
-  const gj = await g.json();
-  const d = await fetch(apiUrl, {
-    method: 'DELETE',
-    headers: { ...h, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, branch: GITHUB_BRANCH, sha: gj.sha }),
+// 通过代理删除 CloudBase 云存储文件（按 fileID）
+async function deleteCloudFile(fileID) {
+  if (!fileID) return;
+  const resp = await fetch(UPLOAD_PROXY_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'delete', fileID }),
   });
-  if (d.status === 404) return;
+  if (!resp.ok) {
+    const j = await resp.json().catch(() => ({}));
+    throw new Error(j.error || ('HTTP ' + resp.status));
+  }
+}
   if (!d.ok) throw new Error('删除失败 HTTP ' + d.status);
 }
 
