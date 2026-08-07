@@ -643,7 +643,7 @@ const WEBHOOK_FIELDS = {
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-07l';
+const APP_VERSION = '2026-08-07m';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -1890,6 +1890,14 @@ function init() {
     localStorage.setItem('outbound_reset_v', RESET_VERSION);
   }
 
+  // 一次性仅清通话（2026-08-07m）：按用户要求「每次同步新线索本机通话归零」，
+  // 先清掉新规则生效前残留的本机通话，且不动已回传状态（outbound_synced/reached 保留）。
+  const CALLS_RESET_V = '2026-08-07m-clear-calls-once';
+  if (localStorage.getItem('outbound_calls_reset_v') !== CALLS_RESET_V) {
+    localStorage.removeItem('outbound_calls');
+    localStorage.setItem('outbound_calls_reset_v', CALLS_RESET_V);
+  }
+
   // Load calls
   try {
     const saved = localStorage.getItem('outbound_calls');
@@ -1928,6 +1936,12 @@ function init() {
   document.getElementById('searchInput').oninput = renderLeads;
 }
 
+// 线索内容签名：用于检测「是否发生了一次新同步」。仅看线索集合（record_id 与条数），
+// 不依赖单独的时间戳文件，避免改动 sync_leads.py 与 leads.json 结构。
+function computeLeadsSig(list) {
+  return list.length + ':' + list.map(l => l.record_id || '').sort().join('|');
+}
+
 async function login() {
   currentUser = document.getElementById('userSelect').value;
   if (!currentUser) return;
@@ -1935,6 +1949,21 @@ async function login() {
   document.getElementById('app').classList.add('active');
   document.getElementById('currentUser').textContent = currentUser;
   const data = await loadLeads();
+
+  // 每次同步了新线索 → 本机通话（当前登录人）自动归零。
+  // 比对线索内容签名：与上次不同说明发生了新同步，清空本机通话；首次进入不触发（无旧签名）。
+  const leadsSig = computeLeadsSig(data);
+  const lastSig = localStorage.getItem('outbound_leads_sig');
+  if (lastSig !== null && lastSig !== leadsSig) {
+    const before = calls.filter(c => c.user_name === currentUser).length;
+    if (before > 0) {
+      calls = calls.filter(c => c.user_name !== currentUser);
+      persistCalls();
+      toast('已同步新线索，本机通话记录已清空（' + before + ' 条）', 'success');
+    }
+  }
+  localStorage.setItem('outbound_leads_sig', leadsSig);
+
   const me = (currentUser || '').trim();
   leads = (data || []).filter(l => (l.owner_name || '').trim() === me);
   await restoreReturned();  // 跨设备恢复已回传状态（灰显 + 禁用按钮）
