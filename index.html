@@ -583,7 +583,7 @@
       <div class="stats-bar">
         <span>线索: <b id="leadCount">0</b></span>
         <span>通话: <b id="callCount">0</b></span>
-        <span>已上传: <b id="uploadedCount">0</b></span>
+        <span>已回传: <b id="returnedCount">0</b></span>
       </div>
     </div>
     <div class="main-content" id="mainContent"></div>
@@ -643,7 +643,7 @@ const WEBHOOK_FIELDS = {
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-07c';
+const APP_VERSION = '2026-08-07d';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -2029,8 +2029,9 @@ function updateStats() {
   const myCalls = calls.filter(c => c.user_name === currentUser);
   document.getElementById('callCount').textContent = myCalls.length;
   document.getElementById('leadCount').textContent = leads.length;
-  const uploaded = myCalls.filter(c => c.uploaded).length;
-  document.getElementById('uploadedCount').textContent = uploaded;
+  // 已回传：当前登录人名下、已回传客户信息的线索数（syncedLeads 以 record_id 为键）。
+  const returned = leads.filter(l => syncedLeads[l.record_id]).length;
+  document.getElementById('returnedCount').textContent = returned;
 }
 
 function renderLeads() {
@@ -2529,6 +2530,7 @@ async function syncLeadExtra() {
       leadReached[l.record_id] = true;
       try { localStorage.setItem('outbound_reached', JSON.stringify(leadReached)); } catch(e) {}
       renderMain();  // 重渲染：按钮变「已回传」并禁用，左侧卡片按 leadReached 变灰
+      updateStats(); // 同步刷新右上角「已回传」计数
       // 跨设备同步：把已回传状态写回云端（换电脑 / 清缓存也能看到）
       syncReturnedToCloud(l.record_id, timeStr);
     } else {
