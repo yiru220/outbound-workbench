@@ -643,7 +643,7 @@ const WEBHOOK_FIELDS = {
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-07a';
+const APP_VERSION = '2026-08-07b';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -1944,8 +1944,8 @@ async function login() {
 }
 
 // 从云端 returned.json 恢复「已回传」状态：换电脑 / 清缓存后也能正确显示灰显与禁用。
-// 云端优先：云端有记录的 record_id 视为已回传（合并进本地，不覆盖本地已有的）。
-// 反向补推：本地有、云端缺的（如旧版回传未同步的），自动推到云端，保证跨设备一致。
+// ⚠️ 云端为准（单向）：用云端 returned.json 重建本地状态——云端有→已回传，云端无→本设备清除。
+// 不再做「本地→云端」反向补推：否则一旦云端被清空，各设备又会把本地旧记录推回去，导致清不干净。
 async function restoreReturned() {
   let cloud = {};
   try {
@@ -1954,23 +1954,17 @@ async function restoreReturned() {
       const c = await r.json();
       if (c && typeof c === 'object') cloud = c;
     }
-  } catch (e) { /* GET 失败继续，下面仍会补推本地状态 */ }
-  try {
-    let changed = false;
-    for (const [rid, d] of Object.entries(cloud)) {
-      if (!syncedLeads[rid]) { syncedLeads[rid] = d || new Date().toISOString().slice(0, 10); changed = true; }
-      if (!leadReached[rid]) { leadReached[rid] = true; changed = true; }
-    }
-    if (changed) {
-      try { localStorage.setItem('outbound_synced', JSON.stringify(syncedLeads)); } catch(e) {}
-      try { localStorage.setItem('outbound_reached', JSON.stringify(leadReached)); } catch(e) {}
-    }
-    // 本地 -> 云端：本地有、云端缺的（顺序补推，避免并发写入冲突）
-    const missing = Object.entries(syncedLeads).filter(([rid]) => !cloud[rid]);
-    for (const [rid, d] of missing) {
-      await syncReturnedToCloud(rid, d || new Date().toISOString().slice(0, 10));
-    }
-  } catch (e) { /* 离线 / 接口异常不影响本地使用 */ }
+  } catch (e) { /* GET 失败：离线可用，保留本地现状 */ }
+  const newSynced = {};
+  const newReached = {};
+  for (const [rid, d] of Object.entries(cloud)) {
+    newSynced[rid] = d || new Date().toISOString().slice(0, 10);
+    newReached[rid] = true;
+  }
+  syncedLeads = newSynced;
+  leadReached = newReached;
+  try { localStorage.setItem('outbound_synced', JSON.stringify(syncedLeads)); } catch(e) {}
+  try { localStorage.setItem('outbound_reached', JSON.stringify(leadReached)); } catch(e) {}
 }
 
 // 回传成功后把「已回传」状态同步到云端，供其他设备读取。失败自动重试一次。
@@ -2356,6 +2350,10 @@ function renderMain() {
       return;
     }
     container.innerHTML = `<div style="width:100%;max-width:800px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <b style="font-size:14px;">我的通话记录（${myCalls.length}）</b>
+        <button class="btn btn-sm btn-secondary" onclick="clearAllMyRecordings()" style="color:#e03131;border-color:#e03131;">🗑 清空全部录音</button>
+      </div>
       <table class="calls-table">
         <thead><tr><th>客户</th><th>电话</th><th>时间</th><th>时长</th><th>存储状态</th><th>操作</th></tr></thead>
         <tbody>${myCalls.slice().reverse().map(c => renderCallRow(c)).join('')}</tbody>
@@ -3116,6 +3114,30 @@ async function deleteCloudFile(fileID) {
     const j = await resp.json().catch(() => ({}));
     throw new Error(j.error || ('HTTP ' + resp.status));
   }
+}
+
+// 一键清空【本账号】全部录音：遍历本地 calls，逐个删除云端文件（录音+分析），再清本地记录。
+// 说明：云存储无列举接口，只能由各设备凭自身缓存的 cloud_file_id 删除；在每台用过的设备各点一次即可。
+async function clearAllMyRecordings() {
+  const myCalls = calls.filter(c => c.user_name === currentUser);
+  if (myCalls.length === 0) { toast('没有可清空的录音'); return; }
+  if (!confirm('确定清空【本账号】全部录音？将从本地与云存储一并删除，不可恢复。')) return;
+  let ok = true, msg = '';
+  for (const c of myCalls) {
+    const ids = [];
+    if (c.cloud_file_id) ids.push(c.cloud_file_id);
+    if (c.cloud_analysis_file_id) ids.push(c.cloud_analysis_file_id);
+    for (const id of ids) {
+      try { await deleteCloudFile(id); }
+      catch (e) { ok = false; msg = e.message; }
+    }
+  }
+  calls = calls.filter(c => c.user_name !== currentUser);
+  try { localStorage.setItem('outbound_calls', JSON.stringify(calls)); } catch (e) {}
+  updateStats();
+  refreshAfterCallChange();
+  if (ok) toast('已清空本账号全部录音（本地 + 云存储）', 'success');
+  else toast('本地已清空；部分云端文件删除失败：' + (msg || '') + '（可重试或到 CloudBase 控制台删除）', 'error');
 }
 
 function formatDuration(sec) {
