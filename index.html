@@ -643,7 +643,7 @@ const WEBHOOK_FIELDS = {
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-06u';
+const APP_VERSION = '2026-08-07a';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -3116,8 +3116,6 @@ async function deleteCloudFile(fileID) {
     const j = await resp.json().catch(() => ({}));
     throw new Error(j.error || ('HTTP ' + resp.status));
   }
-}
-  if (!d.ok) throw new Error('删除失败 HTTP ' + d.status);
 }
 
 function formatDuration(sec) {
