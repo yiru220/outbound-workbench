@@ -643,7 +643,7 @@ const WEBHOOK_FIELDS = {
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-07i';
+const APP_VERSION = '2026-08-07j';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -2850,6 +2850,7 @@ async function startRecording() {
 
     timerInterval = setInterval(updateTimer, 1000);
     toast('录音已开始 — 请用手机拨打客户并开外放');
+    if (realtimeOn) setTimeout(realtimeTick, 1500);  // 通话中开启浮窗也能立即出字幕
   } catch (e) {
     console.error(e);
     toast('无法访问麦克风，请检查浏览器权限', 'error');
@@ -2885,9 +2886,15 @@ async function toggleRealtimeAssist() {
     if (panel) panel.style.display = 'flex';
     if (!realtimeTimer) realtimeTimer = setInterval(realtimeTick, 6000);
     const sub = document.getElementById('rtSubtitles');
-    if (sub && sub.textContent === '等待通话开始…') sub.textContent = '录音开始后自动生成字幕…';
-    if (!mediaRecorder || mediaRecorder.state !== 'recording') {
-      toast('已开启实时辅助，开始录音后自动生成字幕');
+    const sg = document.getElementById('rtSuggest');
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      // 正在录音：立即抓取首帧，不必等 6 秒
+      setTimeout(realtimeTick, 800);
+      if (sub && (sub.textContent === '等待通话开始…' || sub.textContent === '录音开始后自动生成字幕…')) sub.textContent = '🎙 正在聆听并转写…';
+    } else {
+      if (sub) sub.textContent = '⚠️ 请先点「开始录音」，通话字幕会实时出现';
+      if (sg) sg.innerHTML = '<span style="color:var(--color-text-tertiary,#999);">开始录音后给出教练建议</span>';
+      toast('已开启实时辅助，请点「开始录音」开始通话', 'success');
     }
   } else {
     if (btn) { btn.textContent = '🎧 实时辅助：关'; btn.style.color = 'var(--color-text-secondary,#555)'; btn.style.borderColor = 'var(--color-border-tertiary,#ccc)'; }
@@ -2923,6 +2930,10 @@ async function realtimeTick() {
   if (!mediaRecorder || mediaRecorder.state !== 'recording') return;
   realtimeBusy = true;
   try {
+    const sub = document.getElementById('rtSubtitles');
+    if (sub && (sub.textContent === '等待通话开始…' || sub.textContent === '录音开始后自动生成字幕…' || sub.textContent === '⚠️ 请先点「开始录音」，通话字幕会实时出现' || sub.textContent === '')) {
+      sub.textContent = '🎙 正在聆听并转写…';
+    }
     const mime = mediaRecorder.mimeType || 'audio/webm';
     const blob = new Blob(audioChunks, { type: mime });
     const dataUrl = await blobToDataURL(blob);
@@ -2936,6 +2947,8 @@ async function realtimeTick() {
     if (resp.ok && !j.error) updateRealtimeUI(j);
   } catch (e) {
     console.warn('实时辅助转写失败:', e);
+    const sub = document.getElementById('rtSubtitles');
+    if (sub && sub.textContent.indexOf('⚠️') !== 0) sub.textContent = '⚠️ 转写失败：' + (e && e.message ? e.message : e) + '（已继续，下个周期重试）';
   } finally {
     realtimeBusy = false;
   }
