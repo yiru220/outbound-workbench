@@ -643,7 +643,7 @@ const WEBHOOK_FIELDS = {
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-07h';
+const APP_VERSION = '2026-08-07i';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -2287,6 +2287,7 @@ function renderMain() {
           <div class="record-zone">
             <div id="timerDisplay" class="timer" style="display:none;">00:00</div>
             <button class="record-btn" id="recordBtn" onclick="toggleRecording()">开始录音</button>
+            <button class="record-btn" id="realtimeToggle" onclick="toggleRealtimeAssist()" style="background:var(--color-background-tertiary,#eef);color:var(--color-text-secondary,#555);border:1px solid var(--color-border-tertiary,#ccc);">🎧 实时辅助：关</button>
             <div id="uploadArea"></div>
             <div class="hint" id="recordHint">点击后开始录音，用手机拨打客户，开启外放</div>
           </div>
@@ -2869,6 +2870,96 @@ function stopRecording() {
   document.getElementById('recordHint').classList.remove('recording-hint');
 }
 
+// ========== AI 实时辅助浮窗（复用 /transcribe 链路，零函数改动） ==========
+let realtimeOn = false;
+let realtimeBusy = false;
+let realtimeTimer = null;
+let lastRealtimeFileId = null;
+
+async function toggleRealtimeAssist() {
+  realtimeOn = !realtimeOn;
+  const btn = document.getElementById('realtimeToggle');
+  const panel = document.getElementById('realtimePanel');
+  if (realtimeOn) {
+    if (btn) { btn.textContent = '🎧 实时辅助：开'; btn.style.color = 'var(--color-success,#2f9e44)'; btn.style.borderColor = 'var(--color-success,#2f9e44)'; }
+    if (panel) panel.style.display = 'flex';
+    if (!realtimeTimer) realtimeTimer = setInterval(realtimeTick, 6000);
+    const sub = document.getElementById('rtSubtitles');
+    if (sub && sub.textContent === '等待通话开始…') sub.textContent = '录音开始后自动生成字幕…';
+    if (!mediaRecorder || mediaRecorder.state !== 'recording') {
+      toast('已开启实时辅助，开始录音后自动生成字幕');
+    }
+  } else {
+    if (btn) { btn.textContent = '🎧 实时辅助：关'; btn.style.color = 'var(--color-text-secondary,#555)'; btn.style.borderColor = 'var(--color-border-tertiary,#ccc)'; }
+    if (panel) panel.style.display = 'none';
+    if (realtimeTimer) { clearInterval(realtimeTimer); realtimeTimer = null; }
+  }
+}
+
+function blobToDataURL(blob) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = () => reject(new Error('读取音频失败'));
+    r.readAsDataURL(blob);
+  });
+}
+
+async function uploadAudioGetFileID(dataUrl) {
+  const base64Content = dataUrl.split(',')[1];
+  const filePath = `outbound/realtime/${currentUser}/live.webm`;
+  const resp = await fetch(UPLOAD_PROXY_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cloudPath: filePath, content: base64Content }),
+  });
+  if (!resp.ok) { const e = await resp.json().catch(() => ({})); throw new Error(e.error || ('上传失败 HTTP ' + resp.status)); }
+  const r = await resp.json();
+  return r.fileID;
+}
+
+async function realtimeTick() {
+  if (!realtimeOn || realtimeBusy) return;
+  if (!mediaRecorder || mediaRecorder.state !== 'recording') return;
+  realtimeBusy = true;
+  try {
+    const mime = mediaRecorder.mimeType || 'audio/webm';
+    const blob = new Blob(audioChunks, { type: mime });
+    const dataUrl = await blobToDataURL(blob);
+    lastRealtimeFileId = await uploadAudioGetFileID(dataUrl);
+    const resp = await fetch(TRANSCRIBE_PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fileID: lastRealtimeFileId, name: 'realtime.webm' }),
+    });
+    const j = await resp.json().catch(() => ({}));
+    if (resp.ok && !j.error) updateRealtimeUI(j);
+  } catch (e) {
+    console.warn('实时辅助转写失败:', e);
+  } finally {
+    realtimeBusy = false;
+  }
+}
+
+function updateRealtimeUI(j) {
+  const sub = document.getElementById('rtSubtitles');
+  if (sub && j.transcript) { sub.textContent = j.transcript; sub.scrollTop = sub.scrollHeight; }
+  const sg = document.getElementById('rtSuggest');
+  if (!sg) return;
+  const a = j || {};
+  let html = '';
+  if (a.summary) html += `<div style="margin-bottom:6px;color:var(--color-text-primary,#1a1a1a);">${escapeHtml(a.summary)}</div>`;
+  if (Array.isArray(a.strengths) && a.strengths.length) {
+    html += `<div style="margin:6px 0 2px;color:var(--color-success,#2f9e44);">👍 亮点</div>` +
+      a.strengths.map(s => `<div style="margin:2px 0;padding-left:10px;">• ${escapeHtml(s)}</div>`).join('');
+  }
+  if (Array.isArray(a.weaknesses) && a.weaknesses.length) {
+    html += `<div style="margin:6px 0 2px;color:var(--color-danger,#e03131);">⚠️ 待改进</div>` +
+      a.weaknesses.map(s => `<div style="margin:2px 0;padding-left:10px;">• ${escapeHtml(s)}</div>`).join('');
+  }
+  sg.innerHTML = html || '<span style="color:var(--color-text-tertiary,#999);">分析中…</span>';
+}
+
 function updateTimer() {
   const elapsed = Math.floor((Date.now() - recordStartTime) / 1000);
   const m = Math.floor(elapsed / 60).toString().padStart(2, '0');
@@ -3223,5 +3314,15 @@ init();
 })();
 </script>
 <div id="versionBar" style="position:fixed;bottom:6px;right:10px;font-size:11px;color:#999;opacity:0.7;z-index:50;pointer-events:none;"></div>
+<div id="realtimePanel" style="display:none;position:fixed;right:16px;bottom:16px;width:340px;max-height:72vh;background:var(--color-background-primary,#fff);color:var(--color-text-primary,#1a1a1a);border:1px solid var(--color-border-tertiary,#ddd);border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.18);z-index:9999;flex-direction:column;overflow:hidden;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:13px;">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--color-background-secondary,#f4f6f8);border-bottom:1px solid var(--color-border-tertiary,#eee);">
+    <span style="font-weight:500;">🎧 AI 实时辅助</span>
+    <button onclick="toggleRealtimeAssist()" style="border:none;background:transparent;color:var(--color-text-secondary,#888);font-size:16px;cursor:pointer;line-height:1;">✕</button>
+  </div>
+  <div style="padding:6px 14px;font-size:11px;color:var(--color-text-tertiary,#999);">实时字幕（通话中自动刷新）</div>
+  <div id="rtSubtitles" style="flex:1 1 auto;overflow-y:auto;padding:8px 14px;line-height:1.7;white-space:pre-wrap;min-height:120px;max-height:40vh;border-bottom:1px solid var(--color-border-tertiary,#eee);">等待通话开始…</div>
+  <div style="padding:6px 14px;font-size:11px;color:var(--color-text-tertiary,#999);">AI 教练建议</div>
+  <div id="rtSuggest" style="flex:0 0 auto;overflow-y:auto;padding:8px 14px;max-height:26vh;line-height:1.6;">—</div>
+</div>
 </body>
 </html>
