@@ -643,7 +643,7 @@ const WEBHOOK_FIELDS = {
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-07f';
+const APP_VERSION = '2026-08-07g';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -2360,7 +2360,10 @@ function renderMain() {
     container.innerHTML = `<div style="width:100%;max-width:800px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <b style="font-size:14px;">我的通话记录（${myCalls.length}）</b>
-        <button class="btn btn-sm btn-secondary" onclick="clearAllMyRecordings()" style="color:#e03131;border-color:#e03131;">🗑 清空全部录音</button>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-sm btn-secondary" onclick="exportMyRecordings()">📤 导出本机录音分析</button>
+          <button class="btn btn-sm btn-secondary" onclick="clearAllMyRecordings()" style="color:#e03131;border-color:#e03131;">🗑 清空全部录音</button>
+        </div>
       </div>
       <table class="calls-table">
         <thead><tr><th>客户</th><th>电话</th><th>时间</th><th>时长</th><th>存储状态</th><th>操作</th></tr></thead>
@@ -3153,6 +3156,50 @@ async function clearAllMyRecordings() {
   refreshAfterCallChange();
   if (ok) toast('已清空本账号全部录音（本地 + 云存储）', 'success');
   else toast('本地已清空；部分云端文件删除失败：' + (msg || '') + '（可重试或到 CloudBase 控制台删除）', 'error');
+}
+
+// 一键导出【本账号】全部录音分析到 CloudBase 云存储（与录音同一桶），供后台生成深度报告。
+// 导出路径：outbound/exports/<currentUser>.json（公开可读，Agent 侧直接拉取）。
+// 仅导出元数据 + 转写全文 + 评分（不含 base64 音频），体积可控。
+async function exportMyRecordings() {
+  const myCalls = calls.filter(c => c.user_name === currentUser);
+  if (myCalls.length === 0) { toast('没有可导出的录音'); return; }
+  const data = {
+    user_name: currentUser,
+    exported_at: new Date().toISOString(),
+    total_calls: myCalls.length,
+    analyzed_count: myCalls.filter(c => c.analysis && (c.analysis.score != null || c.analysis.transcript)).length,
+    calls: myCalls.map(c => ({
+      call_id: c.call_id,
+      lead_name: c.lead_name || '',
+      lead_phone: c.lead_phone || '',
+      user_name: c.user_name,
+      started_at: c.started_at || '',
+      duration: c.duration || '',
+      duration_sec: c.duration_sec || 0,
+      uploaded: !!c.uploaded,
+      cloud_file_id: c.cloud_file_id || '',
+      analysis: c.analysis ? {
+        transcript: c.analysis.transcript || '',
+        score: (c.analysis.score != null ? c.analysis.score : null),
+        dimensions: c.analysis.dimensions || [],
+        strengths: c.analysis.strengths || [],
+        weaknesses: c.analysis.weaknesses || [],
+        summary: c.analysis.summary || '',
+        analysis_error: c.analysis.analysis_error || '',
+      } : null,
+    })),
+  };
+  const path = 'outbound/exports/' + currentUser + '.json';
+  try {
+    toast('正在导出到云端（' + myCalls.length + ' 条）...', 'success');
+    const r = await uploadTextToGitHub(path, JSON.stringify(data, null, 2), 'export recordings: ' + currentUser);
+    const fileID = (r && r.fileID) || path;
+    toast('已导出 ' + myCalls.length + ' 条通话到云端 ✓', 'success');
+    console.log('[导出] fileID=' + fileID + ' url=' + ((r && r.url) || ''));
+  } catch (e) {
+    toast('导出失败：' + e.message, 'error');
+  }
 }
 
 function formatDuration(sec) {
