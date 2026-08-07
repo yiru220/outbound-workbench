@@ -643,7 +643,7 @@ const WEBHOOK_FIELDS = {
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-07b';
+const APP_VERSION = '2026-08-07c';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -1882,7 +1882,7 @@ function init() {
 
   // 一次性清空测试数据（2026-08-05g）：此前所有录音与回传均为测试数据，全部清除。
   // 仅每个浏览器首次加载时执行一次（按 RESET_VERSION 判定），服务器文件已另行删除。
-  const RESET_VERSION = '2026-08-05g-clear-test';
+  const RESET_VERSION = '2026-08-07-clear-stats';
   if (localStorage.getItem('outbound_reset_v') !== RESET_VERSION) {
     localStorage.removeItem('outbound_calls');   // 网站内的通话/录音列表
     localStorage.removeItem('outbound_synced');  // 回传按钮变暗状态（测试回传全部作废，按钮复原）
