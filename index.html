@@ -643,7 +643,7 @@ const WEBHOOK_FIELDS = {
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-07e';
+const APP_VERSION = '2026-08-07f';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -2913,15 +2913,8 @@ function saveAndUpload() {
     // Keep only last 200 calls
     if (calls.length > 200) calls = calls.slice(-200);
 
-    try {
-      localStorage.setItem('outbound_calls', JSON.stringify(calls));
-    } catch(e) {
-      // Remove oldest calls to make room
-      calls = calls.slice(-100);
-      try { localStorage.setItem('outbound_calls', JSON.stringify(calls)); } catch(e2) {
-        toast('存储空间不足，请清理旧录音', 'error');
-      }
-    }
+    // 持久化时自动剥离 base64 音频，避免 localStorage 配额被撑爆（不再弹「存储空间不足」）
+    persistCalls();
 
     updateStats();
     refreshRecordingsBlock();  // 录音刚保存即显示在「该客户的通话录音」区块
@@ -3033,10 +3026,23 @@ async function uploadToGitHub(call, dataUrl) {
   refreshAfterCallChange();  // 切换音频源为 GitHub 链接 / 或刷新历史页
 }
 
+// 持久化通话记录到 localStorage：序列化时剥离 base64 音频（audio_data），
+// 避免本地配额被录音撑爆（localStorage 单域仅 ~5MB）。已上传录音的播放走云端链接
+// （github_raw / cloud_url），无需本地 base64；本机会话内的未上传录音仍保留在内存中供重试/试听。
+function persistCalls() {
+  const ser = (arr) => JSON.stringify(arr, (k, v) => (k === 'audio_data' ? undefined : v));
+  try {
+    localStorage.setItem('outbound_calls', ser(calls));
+  } catch (e) {
+    // 极端情况下仍写不进（理论上剥离音频后极少发生）：降级丢弃最旧记录重试一次
+    try { calls = calls.slice(-150); localStorage.setItem('outbound_calls', ser(calls)); } catch (e2) {}
+  }
+}
+
 function updateCallInStorage(call) {
   const idx = calls.findIndex(c => c.call_id === call.call_id);
   if (idx >= 0) calls[idx] = call;
-  try { localStorage.setItem('outbound_calls', JSON.stringify(calls)); } catch(e) {}
+  persistCalls();
 }
 
 async function retryUpload(callId) {
@@ -3093,7 +3099,7 @@ async function deleteCall(callId) {
 
   // 1) 本地删除
   calls = calls.filter(c => c.call_id !== callId);
-  try { localStorage.setItem('outbound_calls', JSON.stringify(calls)); } catch (e) {}
+  persistCalls();
   updateStats();
 
   // 2) 服务器删除（云存储：录音 + 分析 JSON）；任一处失败仅提示，不影响本地删除
@@ -3142,7 +3148,7 @@ async function clearAllMyRecordings() {
     }
   }
   calls = calls.filter(c => c.user_name !== currentUser);
-  try { localStorage.setItem('outbound_calls', JSON.stringify(calls)); } catch (e) {}
+  persistCalls();
   updateStats();
   refreshAfterCallChange();
   if (ok) toast('已清空本账号全部录音（本地 + 云存储）', 'success');
