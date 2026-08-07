@@ -643,7 +643,7 @@ const WEBHOOK_FIELDS = {
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-07j';
+const APP_VERSION = '2026-08-07k';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -2824,6 +2824,7 @@ async function startRecording() {
 
     mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
     audioChunks = [];
+    rtProcessed = 0; rtFull = '';   // 新一通电话：重置增量转写游标
 
     mediaRecorder.ondataavailable = e => {
       if (e.data.size > 0) audioChunks.push(e.data);
@@ -2876,6 +2877,8 @@ let realtimeOn = false;
 let realtimeBusy = false;
 let realtimeTimer = null;
 let lastRealtimeFileId = null;
+let rtProcessed = 0;          // 已转写的 audioChunks 索引（增量转写游标）
+let rtFull = '';              // 累积字幕全文
 
 async function toggleRealtimeAssist() {
   realtimeOn = !realtimeOn;
@@ -2884,7 +2887,7 @@ async function toggleRealtimeAssist() {
   if (realtimeOn) {
     if (btn) { btn.textContent = '🎧 实时辅助：开'; btn.style.color = 'var(--color-success,#2f9e44)'; btn.style.borderColor = 'var(--color-success,#2f9e44)'; }
     if (panel) panel.style.display = 'flex';
-    if (!realtimeTimer) realtimeTimer = setInterval(realtimeTick, 6000);
+    if (!realtimeTimer) realtimeTimer = setInterval(realtimeTick, 3000);  // 3 秒刷新更跟手
     const sub = document.getElementById('rtSubtitles');
     const sg = document.getElementById('rtSuggest');
     if (mediaRecorder && mediaRecorder.state === 'recording') {
@@ -2900,6 +2903,7 @@ async function toggleRealtimeAssist() {
     if (btn) { btn.textContent = '🎧 实时辅助：关'; btn.style.color = 'var(--color-text-secondary,#555)'; btn.style.borderColor = 'var(--color-border-tertiary,#ccc)'; }
     if (panel) panel.style.display = 'none';
     if (realtimeTimer) { clearInterval(realtimeTimer); realtimeTimer = null; }
+    rtProcessed = 0; rtFull = '';   // 关闭即清空累积，下次重新来
   }
 }
 
@@ -2928,6 +2932,12 @@ async function uploadAudioGetFileID(dataUrl) {
 async function realtimeTick() {
   if (!realtimeOn || realtimeBusy) return;
   if (!mediaRecorder || mediaRecorder.state !== 'recording') return;
+  // 增量：只取「已完成且未转写」的 chunk（留最后 1 个等写完，避免半句被切断）
+  const total = audioChunks.length;
+  const upto = Math.max(0, total - 1);
+  if (upto <= rtProcessed) return;                 // 无新音频，跳过，不浪费调用
+  const newChunks = audioChunks.slice(rtProcessed, upto);
+  rtProcessed = upto;
   realtimeBusy = true;
   try {
     const sub = document.getElementById('rtSubtitles');
@@ -2935,7 +2945,7 @@ async function realtimeTick() {
       sub.textContent = '🎙 正在聆听并转写…';
     }
     const mime = mediaRecorder.mimeType || 'audio/webm';
-    const blob = new Blob(audioChunks, { type: mime });
+    const blob = new Blob(newChunks, { type: mime });   // 只传最近几秒，体积恒定、不随通话变长
     const dataUrl = await blobToDataURL(blob);
     lastRealtimeFileId = await uploadAudioGetFileID(dataUrl);
     const resp = await fetch(TRANSCRIBE_PROXY_URL, {
@@ -2944,7 +2954,13 @@ async function realtimeTick() {
       body: JSON.stringify({ fileID: lastRealtimeFileId, name: 'realtime.webm' }),
     });
     const j = await resp.json().catch(() => ({}));
-    if (resp.ok && !j.error) updateRealtimeUI(j);
+    if (resp.ok && !j.error) {
+      if (j.transcript) {                            // 逐段累积拼接，字幕连贯且即时
+        rtFull = rtFull ? rtFull + '\n' + j.transcript : j.transcript;
+      }
+      if (sub) { sub.textContent = rtFull || '🎙 正在聆听并转写…'; sub.scrollTop = sub.scrollHeight; }
+      updateRealtimeSuggest(j);                      // 建议区用本段 LLM 反馈实时刷新
+    }
   } catch (e) {
     console.warn('实时辅助转写失败:', e);
     const sub = document.getElementById('rtSubtitles');
@@ -2954,9 +2970,7 @@ async function realtimeTick() {
   }
 }
 
-function updateRealtimeUI(j) {
-  const sub = document.getElementById('rtSubtitles');
-  if (sub && j.transcript) { sub.textContent = j.transcript; sub.scrollTop = sub.scrollHeight; }
+function updateRealtimeSuggest(j) {
   const sg = document.getElementById('rtSuggest');
   if (!sg) return;
   const a = j || {};
