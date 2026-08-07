@@ -643,7 +643,7 @@ const WEBHOOK_FIELDS = {
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-07g';
+const APP_VERSION = '2026-08-07h';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -2360,10 +2360,7 @@ function renderMain() {
     container.innerHTML = `<div style="width:100%;max-width:800px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <b style="font-size:14px;">我的通话记录（${myCalls.length}）</b>
-        <div style="display:flex;gap:8px;">
-          <button class="btn btn-sm btn-secondary" onclick="exportMyRecordings()">📤 导出本机录音分析</button>
-          <button class="btn btn-sm btn-secondary" onclick="clearAllMyRecordings()" style="color:#e03131;border-color:#e03131;">🗑 清空全部录音</button>
-        </div>
+        <button class="btn btn-sm btn-secondary" onclick="clearAllMyRecordings()" style="color:#e03131;border-color:#e03131;">🗑 清空全部录音</button>
       </div>
       <table class="calls-table">
         <thead><tr><th>客户</th><th>电话</th><th>时间</th><th>时长</th><th>存储状态</th><th>操作</th></tr></thead>
@@ -2499,18 +2496,22 @@ async function syncLeadExtra() {
   if (phoneDigits) values[F.phone] = [{ type: 'text', text: phoneDigits }];
   values[F.date] = timeStr;  // 回传日期：年月日格式，写入当天日期
   // 通话评分 / 通话评价：该客户多段录音取最高分那段，评分写数字、评价写其总体点评 summary（文本）
+  // 同时收集本客户全部通话，回传成功时整包推到 CloudBase（与录音同桶）。
   let maxScore = null;
   let bestSummary = '';
+  const matchedCalls = [];
   for (const c of calls) {
     const match = (phone && c.lead_phone === phone) || (name && c.lead_name === name);
     if (!match) continue;
     const a = c.analysis;
-    if (!a) continue;
-    if (typeof a.score === 'number' && (maxScore === null || a.score > maxScore)) {
-      maxScore = a.score;
-      if (a.summary) bestSummary = a.summary;
+    if (a) {
+      if (typeof a.score === 'number' && (maxScore === null || a.score > maxScore)) {
+        maxScore = a.score;
+        if (a.summary) bestSummary = a.summary;
+      }
+      if (!bestSummary && a.summary) bestSummary = a.summary;  // 兜底：无评分但有评价文字
     }
-    if (!bestSummary && a.summary) bestSummary = a.summary;  // 兜底：无评分但有评价文字
+    matchedCalls.push(c);
   }
   if (maxScore !== null) values[F.score] = maxScore;  // 数字型字段：单元格值为 double，直接传标量数字（不能包数组，否则报 2022017）
   if (bestSummary) values[F.evaluation] = [{ type: 'text', text: bestSummary }];  // 文本字段：按文本格式发送
@@ -2543,6 +2544,8 @@ async function syncLeadExtra() {
       updateStats(); // 同步刷新右上角「已回传」计数
       // 跨设备同步：把已回传状态写回云端（换电脑 / 清缓存也能看到）
       syncReturnedToCloud(l.record_id, timeStr);
+      // 同时把本客户所有通话的转写+评分推到 CloudBase 同一桶（与录音同桶），供后台深度分析。失败不阻断回传。
+      pushReturnAnalysis(l, matchedCalls, timeStr).catch((e) => console.warn('[回传分析] 推送云端失败:', e));
     } else {
       st.style.color = 'red';
       st.textContent = '❌ 回传失败: ' + (msg || ('HTTP ' + resp.status));
@@ -3158,48 +3161,41 @@ async function clearAllMyRecordings() {
   else toast('本地已清空；部分云端文件删除失败：' + (msg || '') + '（可重试或到 CloudBase 控制台删除）', 'error');
 }
 
-// 一键导出【本账号】全部录音分析到 CloudBase 云存储（与录音同一桶），供后台生成深度报告。
-// 导出路径：outbound/exports/<currentUser>.json（公开可读，Agent 侧直接拉取）。
-// 仅导出元数据 + 转写全文 + 评分（不含 base64 音频），体积可控。
-async function exportMyRecordings() {
-  const myCalls = calls.filter(c => c.user_name === currentUser);
-  if (myCalls.length === 0) { toast('没有可导出的录音'); return; }
+// 回传成功时，把本客户【所有通话】的转写全文 + 5 维评分 + 优缺点 + 总评推到 CloudBase 同一桶（与录音同桶），供后台深度分析。
+// 路径：outbound/exports/<currentUser>/<record_id>.json（公开可读，Agent 侧直接拉取）。不含 base64 音频，体积小。
+// 调用方已用 .catch 包裹，推送失败不影响回传主流程。
+async function pushReturnAnalysis(lead, matchedCalls, returnedAt) {
+  const callsData = matchedCalls.map(c => ({
+    call_id: c.call_id,
+    lead_name: c.lead_name || '',
+    lead_phone: c.lead_phone || '',
+    started_at: c.started_at || '',
+    duration: c.duration || '',
+    duration_sec: c.duration_sec || 0,
+    uploaded: !!c.uploaded,
+    analysis: c.analysis ? {
+      transcript: c.analysis.transcript || '',
+      score: (c.analysis.score != null ? c.analysis.score : null),
+      dimensions: c.analysis.dimensions || [],
+      strengths: c.analysis.strengths || [],
+      weaknesses: c.analysis.weaknesses || [],
+      summary: c.analysis.summary || '',
+      analysis_error: c.analysis.analysis_error || '',
+    } : null,
+  }));
   const data = {
+    record_id: lead.record_id || '',
+    lead_name: (lead.name || lead.account_name || ''),
+    lead_phone: (lead.phone || ''),
     user_name: currentUser,
-    exported_at: new Date().toISOString(),
-    total_calls: myCalls.length,
-    analyzed_count: myCalls.filter(c => c.analysis && (c.analysis.score != null || c.analysis.transcript)).length,
-    calls: myCalls.map(c => ({
-      call_id: c.call_id,
-      lead_name: c.lead_name || '',
-      lead_phone: c.lead_phone || '',
-      user_name: c.user_name,
-      started_at: c.started_at || '',
-      duration: c.duration || '',
-      duration_sec: c.duration_sec || 0,
-      uploaded: !!c.uploaded,
-      cloud_file_id: c.cloud_file_id || '',
-      analysis: c.analysis ? {
-        transcript: c.analysis.transcript || '',
-        score: (c.analysis.score != null ? c.analysis.score : null),
-        dimensions: c.analysis.dimensions || [],
-        strengths: c.analysis.strengths || [],
-        weaknesses: c.analysis.weaknesses || [],
-        summary: c.analysis.summary || '',
-        analysis_error: c.analysis.analysis_error || '',
-      } : null,
-    })),
+    returned_at: returnedAt || new Date().toISOString().slice(0, 10),
+    total_calls: matchedCalls.length,
+    analyzed_count: callsData.filter(x => x.analysis).length,
+    calls: callsData,
   };
-  const path = 'outbound/exports/' + currentUser + '.json';
-  try {
-    toast('正在导出到云端（' + myCalls.length + ' 条）...', 'success');
-    const r = await uploadTextToGitHub(path, JSON.stringify(data, null, 2), 'export recordings: ' + currentUser);
-    const fileID = (r && r.fileID) || path;
-    toast('已导出 ' + myCalls.length + ' 条通话到云端 ✓', 'success');
-    console.log('[导出] fileID=' + fileID + ' url=' + ((r && r.url) || ''));
-  } catch (e) {
-    toast('导出失败：' + e.message, 'error');
-  }
+  const fileId = (lead.record_id || ('phone_' + (lead.phone || 'unknown')));
+  const path = 'outbound/exports/' + currentUser + '/' + fileId + '.json';
+  await uploadTextToGitHub(path, JSON.stringify(data, null, 2), 'return analysis: ' + fileId);
 }
 
 function formatDuration(sec) {
