@@ -628,23 +628,23 @@ function rawUrlOf(call) {
 // 回传字段映射：本表字段 key -> 目标表「字段ID」(来自「11-线索回执表」真实配置)。
 // 用 field_id 而非列名，避免列名存在空格/异体字导致 webhook 报 field not exists。
 const WEBHOOK_FIELDS = {
-  gender:   'fUGe6b',   // 性别 (单选)
-  province: 'fu0uQ1',   // 省 (单选)
+  gender:   'fUGe6b',   // 性别 (文本 — 2026-08-08 由单选改为文本)
+  province: 'fu0uQ1',   // 省 (文本)
   city:     'fz0DpX',   // 市 (文本)
-  hasStore: 'fVBgw9',   // 是否自有门店 (单选)
-  keyCustomer: 'fcMF2G', // 重点客户 (单选：是/否)
-  inviteGroup: 'fyGPwu', // 邀约进群 (单选：已邀约/拒绝进群/其他)
-  age:      'faUSXZ',   // 年龄（根据声音估计）(单选：30以下/30-40/40-50/50-60/60以上)
+  hasStore: 'fVBgw9',   // 是否自有门店 (文本 — 由单选改为文本)
+  keyCustomer: 'fcMF2G', // 重点客户 (文本 — 由单选改为文本)
+  inviteGroup: 'fyGPwu', // 邀约进群 (文本 — 由单选改为文本)
+  age:      'faUSXZ',   // 年龄（根据声音估计）(文本 — 由单选改为文本)
   remark:   'fXGIQi',   // 备注 (文本)
   score:    'fIAeZQ',   // 通话评分 (数字：取该客户多段录音最高分)
   evaluation: 'fe5eon', // 通话评价 (文本：取最高分那段录音的总体点评 summary)
   phone:    'fuvsCp',   // 手机号 (文本)
   date:     'fEDPIZ',   // 回传日期 (日期时间)
-  validity: 'fjJeLC'    // 有效性 (单选：无效线索) — 2026-08-08 新增字段
+  validity: 'fjJeLC'    // 有效性 (文本 — 2026-08-08 新增字段，原为单选已改文本)
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-08a';
+const APP_VERSION = '2026-08-08b';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -2517,16 +2517,18 @@ async function syncLeadExtra() {
   const ex = leadExtras[l.record_id] || {};
   const timeStr = fmtDate(new Date());
   const F = WEBHOOK_FIELDS;
-  // 企微智能表格写入格式：单选=[{text:值}]，文本=[{type:"text",text:值}]
-  // 手机号/市均为文本字段，必须按文本格式发送；空值字段不发送，避免校验失败
+  // 企微智能表格写入格式：回传表(thjsdd)字段类型已统一为【文本】——
+  // 性别/省/市/是否自有门店/重点客户/邀约进群/年龄/有效性/手机号/通话评价/备注 均为 FIELD_TYPE_TEXT，
+  // 统一按文本格式 [{type:"text",text:值}] 发送；回传日期为日期时间、通话评分为数字标量。
+  // 空值字段不发送，避免校验失败。
   const values = {};
-  if (ex.gender)   values[F.gender]   = [{ text: ex.gender }];
-  if (ex.province) values[F.province] = [{ text: ex.province }];
+  if (ex.gender)   values[F.gender]   = [{ type: 'text', text: ex.gender }];
+  if (ex.province) values[F.province] = [{ type: 'text', text: ex.province }];
   if (ex.city)     values[F.city]     = [{ type: 'text', text: ex.city }];
-  if (ex.hasStore) values[F.hasStore] = [{ text: ex.hasStore }];
-  if (ex.keyCustomer) values[F.keyCustomer] = [{ text: ex.keyCustomer }];
-  if (ex.inviteGroup) values[F.inviteGroup] = [{ text: ex.inviteGroup }];
-  if (ex.age) values[F.age] = [{ text: ex.age }];
+  if (ex.hasStore) values[F.hasStore] = [{ type: 'text', text: ex.hasStore }];
+  if (ex.keyCustomer) values[F.keyCustomer] = [{ type: 'text', text: ex.keyCustomer }];
+  if (ex.inviteGroup) values[F.inviteGroup] = [{ type: 'text', text: ex.inviteGroup }];
+  if (ex.age) values[F.age] = [{ type: 'text', text: ex.age }];
   if (ex.remark) values[F.remark] = [{ type: 'text', text: ex.remark }];
   const phoneDigits = String(phone).replace(/\D/g, '');
   if (phoneDigits) values[F.phone] = [{ type: 'text', text: phoneDigits }];
@@ -2551,7 +2553,7 @@ async function syncLeadExtra() {
   }
   if (maxScore !== null) values[F.score] = maxScore;  // 数字型字段：单元格值为 double，直接传标量数字（不能包数组，否则报 2022017）
   if (bestSummary) values[F.evaluation] = [{ type: 'text', text: bestSummary }];  // 文本字段：按文本格式发送
-  if (ex.invalid) values[F.validity] = [{ text: '无效线索' }];  // 无效线索（3 次电话未触达）标记写入回传表「有效性」字段
+  if (ex.invalid) values[F.validity] = [{ type: 'text', text: '无效线索' }];  // 无效线索（3 次电话未触达）标记写入回传表「有效性」字段（文本型）
   const payload = { add_records: [ { values: values } ] };
   const btn = document.getElementById('syncBtn');
   const st = document.getElementById('syncStatus');
