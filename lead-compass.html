@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>线索罗盘 · Lead Compass｜高客单价低频次业务线索势能看板</title>
-<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<script src="./echarts.min.js"></script>
 <style>
   :root{
     --bg:#F4F8F6; --card:#FFFFFF; --ink:#243A33; --sub:#6B8178;
@@ -305,7 +305,10 @@ function render(){
   document.getElementById('kRet').textContent=fmtInt(retTotal);
   document.getElementById('kInv').textContent=fmtInt(invalid);
 
-  renderPlatform(); renderOwner(); renderMonth(); renderReturn(); renderTable();
+  // 图表渲染容错：单张图失败不影响其余内容与表格
+  const safe=fn=>{try{fn();}catch(e){console.error('[lead-compass] chart error:',e);}};
+  safe(renderPlatform); safe(renderOwner); safe(renderMonth); safe(renderReturn);
+  renderTable();
 }
 
 let charts={};
