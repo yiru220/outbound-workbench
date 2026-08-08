@@ -52,17 +52,6 @@
   .panel .desc{font-size:11.5px;color:var(--sub);margin:0 0 10px;}
   .chart{width:100%;height:300px;}
   .chart.tall{height:340px;}
-  /* framework */
-  .framework{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;
-    box-shadow:var(--shadow);margin-bottom:22px;}
-  .framework h2{font-size:17px;margin:0 0 4px;display:flex;align-items:center;gap:8px;}
-  .framework .sub{font-size:12.5px;color:var(--sub);margin:0 0 14px;}
-  .fw-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:20px;align-items:center;}
-  .fw-text ul{margin:8px 0 0;padding-left:18px;}
-  .fw-text li{font-size:13px;margin-bottom:9px;color:#33483F;}
-  .fw-text li b{color:var(--green-deep);}
-  .fw-svg{background:#FBFCFB;border:1px solid var(--line);border-radius:10px;padding:6px;}
-  .fw-svg svg{display:block;width:100%;height:auto;}
   /* table */
   .tablecard{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow);}
   .tablecard .thead{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;}
@@ -80,7 +69,7 @@
   .empty{text-align:center;color:var(--sub);padding:40px;font-size:14px;}
   footer{margin-top:30px;font-size:11.5px;color:var(--sub);text-align:center;line-height:1.7;}
   .err{background:var(--red-soft);color:var(--red);padding:12px 16px;border-radius:10px;font-size:13px;margin-bottom:18px;display:none;}
-  @media(max-width:880px){.kpis{grid-template-columns:repeat(2,1fr);}.grid2{grid-template-columns:1fr;}.fw-grid{grid-template-columns:1fr;}}
+  @media(max-width:880px){.kpis{grid-template-columns:repeat(2,1fr);}.grid2{grid-template-columns:1fr;}}
 </style>
 </head>
 <body>
@@ -95,15 +84,15 @@
     </div>
     <div class="meta">
       数据更新：<b id="mTime">加载中…</b><br>
-      数据源：外呼工作台 leads.json + 回传表统计
+      数据源：共享表格·线索表 + 线索回执表（每日同步）
     </div>
   </header>
 
   <p class="lead-note">
-    高客单价、低频次的业务（康养套餐、企业服务、财富管理…）成交周期长、月成交仅十几单，
-    <b>用「成交端」指标（CAC、转化率、LTV）衡量会剧烈波动、失去意义</b>。
-    本看板遵循<b>「指标重心前移」</b>原则：把衡量放到<b>线索端 + 管道端</b>——
-    用 CPL、单条线索产值、管道预估金额、营销 ROI 来预判收入，而不是等成交后才统计。
+    本看板是<b>线索可视化看板</b>，数据来自共享表格的「线索表」与「线索回执表」。
+    针对<b>高客单价、低频次</b>业务（康养套餐、企业服务、财富管理…）成交周期长、月成交仅十几单的特点，
+    指标体系遵循<b>「重心前移」</b>：以<b>线索端 + 管道端</b>为核心，用 CPL、单条线索产值、管道预估金额、营销 ROI
+    在「成交之前」预判收入，而非等成交后才统计。
   </p>
 
   <div class="err" id="errBox"></div>
@@ -156,86 +145,6 @@
     </div>
   </div>
 
-  <!-- framework -->
-  <div class="framework">
-    <h2>📐 为什么是「重心前移」</h2>
-    <p class="sub">高客单价低频次业务，指标必须从「成交端」前移到「线索端 + 管道端」</p>
-    <div class="fw-grid">
-      <div class="fw-text">
-        <ul>
-          <li><b>常规业务</b>（电商 / SaaS / 快消）：月成交数百~数千单、客单价几十~几百元 → 用 <b>CAC、转化率、LTV</b>，月度即可稳定统计。</li>
-          <li><b>高客单价低频次</b>（康养 / 企服 / 房产 / 财富）：月成交十几单、客单价 15~30 万 → 成交端指标样本太小、波动剧烈，<b>失去指导意义</b>。</li>
-          <li>于是把重心前移：用 <b>CPL（单条线索成本）</b>、<b>单条线索产值</b>、<b>管道金额 + 管道流速</b>、<b>营销 ROI</b> 在「成交之前」预判收入。</li>
-          <li>统计窗口也从「月度」拉长到 <b>季度 / 半年滚动</b>，平滑低频业务的天然波动。</li>
-        </ul>
-      </div>
-      <div class="fw-svg">
-<!-- 用户提供的「重心前移」对比图，内嵌以说明框架 -->
-<svg viewBox="0 0 680 720" width="100%" role="img" aria-label="高客单价低频次业务与常规业务指标体系对比">
-<title>高客单价低频次 vs 常规业务指标体系差异</title>
-<desc>对比两种业务场景下核心指标的选取差异</desc>
-<defs><marker id="arrow2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
-<text x="340" y="28" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="500" fill="#2C2C2A">高客单价低频次业务：指标体系需要「重心前移」</text>
-<g><rect x="40" y="50" width="280" height="640" rx="12" fill="#F1EFE8" stroke="#B4B2A9" stroke-width="0.5"/>
-<text x="180" y="78" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="500" fill="#444441">常规业务（高频次·低客单）</text>
-<text x="180" y="98" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#5F5E5A">如：电商、SaaS订阅、快消品</text>
-<line x1="60" y1="112" x2="300" y2="112" stroke="#D3D1C7" stroke-width="0.5"/>
-<text x="60" y="134" font-family="sans-serif" font-size="12" font-weight="500" fill="#5F5E5A">核心指标</text>
-<text x="60" y="158" font-family="sans-serif" font-size="12" fill="#444441">CAC = 总投入 / 成交客户数</text>
-<text x="60" y="178" font-family="sans-serif" font-size="11" fill="#888780">成交量大，月均几百单，CAC稳定</text>
-<text x="60" y="208" font-family="sans-serif" font-size="12" fill="#444441">转化率 = 成交数 / 线索数</text>
-<text x="60" y="228" font-family="sans-serif" font-size="11" fill="#888780">分母分子都大，比率有意义</text>
-<text x="60" y="258" font-family="sans-serif" font-size="12" fill="#444441">LTV / CAC 健康线 ≥ 3:1</text>
-<text x="60" y="278" font-family="sans-serif" font-size="11" fill="#888780">客户多，LTV统计可行</text>
-<text x="60" y="308" font-family="sans-serif" font-size="12" fill="#444441">ROI = 收入 / 投入</text>
-<text x="60" y="328" font-family="sans-serif" font-size="11" fill="#888780">月度即可算，波动小</text>
-<line x1="60" y1="352" x2="300" y2="352" stroke="#D3D1C7" stroke-width="0.5"/>
-<text x="180" y="376" text-anchor="middle" font-family="sans-serif" font-size="12" font-weight="500" fill="#5F5E5A">指标重心</text>
-<rect x="70" y="390" width="220" height="36" rx="6" fill="#E1F5EE" stroke="#5DCAA5" stroke-width="0.5"/>
-<text x="180" y="412" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#0F6E56">以「成交端」为核心</text>
-<text x="60" y="452" font-family="sans-serif" font-size="11" fill="#888780">关注：CAC、转化率、LTV</text>
-<text x="60" y="472" font-family="sans-serif" font-size="11" fill="#888780">每月成交量大 → 统计稳定</text>
-<text x="60" y="502" font-family="sans-serif" font-size="11" fill="#888780">线索端指标为辅：</text>
-<text x="60" y="522" font-family="sans-serif" font-size="11" fill="#888780">CPL、响应率等</text>
-<text x="60" y="552" font-family="sans-serif" font-size="11" fill="#888780">管道金额可预测性低</text>
-<text x="60" y="572" font-family="sans-serif" font-size="11" fill="#888780">（成交快，不需要管道预测）</text>
-<line x1="60" y1="596" x2="300" y2="596" stroke="#D3D1C7" stroke-width="0.5"/>
-<text x="180" y="620" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#888780">月成交：数百~数千单</text>
-<text x="180" y="640" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#888780">客单价：几十~几百元</text>
-<text x="180" y="660" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#888780">统计窗口：月度即可</text></g>
-<g><rect x="360" y="50" width="280" height="640" rx="12" fill="#E6F1FB" stroke="#85B7EB" stroke-width="0.5"/>
-<text x="500" y="78" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="500" fill="#0C447C">高客单价低频次业务</text>
-<text x="500" y="98" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#185FA5">如：康养套餐、企业服务、房产、财富管理</text>
-<line x1="380" y1="112" x2="620" y2="112" stroke="#B5D4F4" stroke-width="0.5"/>
-<text x="380" y="134" font-family="sans-serif" font-size="12" font-weight="500" fill="#185FA5">核心指标（重心前移）</text>
-<text x="380" y="158" font-family="sans-serif" font-size="12" fill="#0C447C">CPL = 总投入 / 线索数</text>
-<text x="380" y="178" font-family="sans-serif" font-size="11" fill="#185FA5">线索量大(月百条+)，CPL稳定</text>
-<text x="380" y="208" font-family="sans-serif" font-size="12" fill="#0C447C">单条线索产值 = 成交额 / 线索数</text>
-<text x="380" y="228" font-family="sans-serif" font-size="11" fill="#185FA5">用金额而非笔数衡量效率</text>
-<text x="380" y="258" font-family="sans-serif" font-size="12" fill="#0C447C">管道金额 + 管道流速</text>
-<text x="380" y="278" font-family="sans-serif" font-size="11" fill="#185FA5">成交周期长，管道可预测收入</text>
-<text x="380" y="308" font-family="sans-serif" font-size="12" fill="#0C447C">营销ROI = 成交额 / 投入</text>
-<text x="380" y="328" font-family="sans-serif" font-size="11" fill="#185FA5">按季度/半年滚动平滑波动</text>
-<line x1="380" y1="352" x2="620" y2="352" stroke="#B5D4F4" stroke-width="0.5"/>
-<text x="500" y="376" text-anchor="middle" font-family="sans-serif" font-size="12" font-weight="500" fill="#185FA5">指标重心</text>
-<rect x="390" y="390" width="220" height="36" rx="6" fill="#E6F1FB" stroke="#378ADD" stroke-width="0.5"/>
-<text x="500" y="412" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#0C447C">以「线索端 + 管道端」为核心</text>
-<text x="380" y="452" font-family="sans-serif" font-size="11" fill="#185FA5">关注：CPL、单条线索产值</text>
-<text x="380" y="472" font-family="sans-serif" font-size="11" fill="#185FA5">月成交十几单 → 成交端不稳定</text>
-<text x="380" y="502" font-family="sans-serif" font-size="11" fill="#185FA5">成交端指标为辅：</text>
-<text x="380" y="522" font-family="sans-serif" font-size="11" fill="#185FA5">CAC按季度滚动、转化率按季度</text>
-<text x="380" y="552" font-family="sans-serif" font-size="11" fill="#185FA5">管道金额可预测性高</text>
-<text x="380" y="572" font-family="sans-serif" font-size="11" fill="#185FA5">（意向客户→管道→预测收入）</text>
-<line x1="380" y1="596" x2="620" y2="596" stroke="#B5D4F4" stroke-width="0.5"/>
-<text x="500" y="620" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#185FA5">月成交：十几单</text>
-<text x="500" y="640" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#185FA5">客单价：15万~30万</text>
-<text x="500" y="660" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#185FA5">统计窗口：季度/半年滚动</text></g>
-<path d="M326 370 L354 370" fill="none" stroke="#888780" stroke-width="1.5" marker-end="url(#arrow2)"/>
-</svg>
-      </div>
-    </div>
-  </div>
-
   <!-- table -->
   <div class="tablecard">
     <div class="thead">
@@ -251,8 +160,8 @@
   </div>
 
   <footer>
-    线索罗盘 · Lead Compass ｜ 数据来自外呼工作台每日同步（leads.json）与回传表统计（returned_stats.json）<br>
-    客单价 / 获客投入为可调假设，用于演示「指标重心前移」下的管道预估与 ROI 测算；真实成交额以回传表为准。
+    线索罗盘 · Lead Compass ｜ 数据来自共享表格「线索表」（leads.json）与「线索回执表」（returned_stats.json / returned.json），每日同步<br>
+    客单价 / 获客投入为可调假设，用于「指标重心前移」下的管道预估与 ROI 测算；真实成交额以回执表为准。
   </footer>
 </div>
 
