@@ -639,11 +639,12 @@ const WEBHOOK_FIELDS = {
   score:    'fIAeZQ',   // 通话评分 (数字：取该客户多段录音最高分)
   evaluation: 'fe5eon', // 通话评价 (文本：取最高分那段录音的总体点评 summary)
   phone:    'fuvsCp',   // 手机号 (文本)
-  date:     'fEDPIZ'    // 回传日期 (日期时间)
+  date:     'fEDPIZ',   // 回传日期 (日期时间)
+  validity: 'fjJeLC'    // 有效性 (单选：无效线索) — 2026-08-08 新增字段
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-07m';
+const APP_VERSION = '2026-08-08a';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -2370,6 +2371,10 @@ function renderMain() {
         </div>
         <div id="recordingsBlock">${renderLeadRecordings(l)}</div>
         <div class="sync-area">
+            <label class="invalid-check" style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:13px;color:#c92a2a;cursor:pointer;user-select:none;">
+              <input type="checkbox" id="exInvalid" ${synced ? 'disabled' : ''} onchange="saveExtra('invalid', this.checked)">
+              <span>❌ 标记无效线索（3 次电话未触达）</span>
+            </label>
             <button class="sync-btn" id="syncBtn" ${synced ? 'disabled' : ''} onclick="syncLeadExtra()">${synced ? '✅ 已回传' : '🚀 回传客户信息'}</button>
             <div class="sync-status" id="syncStatus">${synced ? '该客户已回传，按钮已禁用' : ''}</div>
         </div>
@@ -2433,6 +2438,8 @@ function initExtraFields(l) {
   set('exInviteGroup', ex.inviteGroup);
   set('exAge', ex.age);
   set('exRemark', ex.remark);
+  const invEl = document.getElementById('exInvalid');
+  if (invEl) invEl.checked = !!ex.invalid;  // 恢复「无效线索」勾选状态
   // 省/市：若未回传且省为空，打开线索时自动按手机号归属地预填（不覆盖已填值）
   if (!syncedLeads[l.record_id]) autoFillRegion(false);
 }
@@ -2544,6 +2551,7 @@ async function syncLeadExtra() {
   }
   if (maxScore !== null) values[F.score] = maxScore;  // 数字型字段：单元格值为 double，直接传标量数字（不能包数组，否则报 2022017）
   if (bestSummary) values[F.evaluation] = [{ type: 'text', text: bestSummary }];  // 文本字段：按文本格式发送
+  if (ex.invalid) values[F.validity] = [{ text: '无效线索' }];  // 无效线索（3 次电话未触达）标记写入回传表「有效性」字段
   const payload = { add_records: [ { values: values } ] };
   const btn = document.getElementById('syncBtn');
   const st = document.getElementById('syncStatus');
@@ -3219,6 +3227,7 @@ async function pushReturnAnalysis(lead, matchedCalls, returnedAt) {
     lead_phone: (lead.phone || ''),
     user_name: currentUser,
     returned_at: returnedAt || new Date().toISOString().slice(0, 10),
+    validity: (leadExtras[lead.record_id] || {}).invalid ? '无效线索' : '',
     total_calls: matchedCalls.length,
     analyzed_count: callsData.filter(x => x.analysis).length,
     calls: callsData,
