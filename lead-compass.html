@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>线索罗盘 · Lead Compass｜高客单价低频次业务线索势能看板</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<style>
+  :root{
+    --bg:#F4F8F6; --card:#FFFFFF; --ink:#243A33; --sub:#6B8178;
+    --green:#1F9D74; --green-soft:#E4F4ED; --green-deep:#13795A;
+    --blue:#2E7FD6; --blue-soft:#E7F0FB; --amber:#E0922B; --amber-soft:#FBEEDD;
+    --line:#E4EDE9; --red:#D9544D; --red-soft:#FBE9E8;
+    --shadow:0 2px 14px rgba(31,121,90,.08);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+       background:var(--bg);color:var(--ink);line-height:1.5;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:1180px;margin:0 auto;padding:28px 20px 60px;}
+  header.top{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:14px;margin-bottom:8px;}
+  .brand{display:flex;align-items:center;gap:12px;}
+  .brand .glyph{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,var(--green),var(--blue));
+    display:flex;align-items:center;justify-content:center;font-size:24px;box-shadow:var(--shadow);}
+  .brand h1{font-size:22px;margin:0;letter-spacing:.5px;}
+  .brand .en{font-size:12px;color:var(--sub);letter-spacing:1px;font-weight:600;}
+  .brand .tag{font-size:12px;color:var(--green-deep);background:var(--green-soft);
+    padding:3px 10px;border-radius:20px;margin-left:6px;font-weight:600;}
+  .meta{font-size:12px;color:var(--sub);text-align:right;}
+  .meta b{color:var(--green-deep);}
+  .lead-note{font-size:13px;color:var(--sub);margin:6px 0 22px;max-width:820px;}
+  .lead-note b{color:var(--green-deep);}
+  /* control bar */
+  .controls{display:flex;flex-wrap:wrap;gap:18px;background:var(--card);border:1px solid var(--line);
+    border-radius:14px;padding:16px 20px;box-shadow:var(--shadow);margin-bottom:22px;}
+  .ctrl{display:flex;flex-direction:column;gap:6px;min-width:240px;flex:1;}
+  .ctrl label{font-size:12px;color:var(--sub);display:flex;justify-content:space-between;}
+  .ctrl label b{color:var(--ink);font-size:13px;}
+  input[type=range]{width:100%;accent-color:var(--green);}
+  /* kpi grid */
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px;}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow);}
+  .kpi .k{font-size:12px;color:var(--sub);margin-bottom:8px;display:flex;align-items:center;gap:6px;}
+  .kpi .v{font-size:24px;font-weight:700;letter-spacing:.5px;}
+  .kpi .v small{font-size:13px;font-weight:600;color:var(--sub);margin-left:3px;}
+  .kpi.green .v{color:var(--green-deep);} .kpi.blue .v{color:var(--blue);}
+  .kpi.amber .v{color:var(--amber);} .kpi.red .v{color:var(--red);}
+  .kpi .hint{font-size:11px;color:var(--sub);margin-top:6px;}
+  /* charts */
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:22px;}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px 8px;box-shadow:var(--shadow);}
+  .panel h3{margin:0 0 4px;font-size:15px;}
+  .panel .desc{font-size:11.5px;color:var(--sub);margin:0 0 10px;}
+  .chart{width:100%;height:300px;}
+  .chart.tall{height:340px;}
+  /* framework */
+  .framework{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;
+    box-shadow:var(--shadow);margin-bottom:22px;}
+  .framework h2{font-size:17px;margin:0 0 4px;display:flex;align-items:center;gap:8px;}
+  .framework .sub{font-size:12.5px;color:var(--sub);margin:0 0 14px;}
+  .fw-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:20px;align-items:center;}
+  .fw-text ul{margin:8px 0 0;padding-left:18px;}
+  .fw-text li{font-size:13px;margin-bottom:9px;color:#33483F;}
+  .fw-text li b{color:var(--green-deep);}
+  .fw-svg{background:#FBFCFB;border:1px solid var(--line);border-radius:10px;padding:6px;}
+  .fw-svg svg{display:block;width:100%;height:auto;}
+  /* table */
+  .tablecard{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow);}
+  .tablecard .thead{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;}
+  .tablecard h3{margin:0;font-size:15px;}
+  .search{flex:1;min-width:200px;max-width:320px;padding:8px 12px;border:1px solid var(--line);border-radius:9px;font-size:13px;outline:none;}
+  .search:focus{border-color:var(--green);}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th,td{padding:9px 10px;text-align:left;border-bottom:1px solid var(--line);}
+  th{color:var(--sub);font-weight:600;font-size:12px;background:#FAFCFB;position:sticky;top:0;}
+  tbody tr:hover{background:var(--green-soft);}
+  .pill{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11.5px;font-weight:600;}
+  .pill.key{background:var(--amber-soft);color:var(--amber);}
+  .pill.coop{background:var(--green-soft);color:var(--green-deep);}
+  .pill.no{background:#EEF2F0;color:var(--sub);}
+  .empty{text-align:center;color:var(--sub);padding:40px;font-size:14px;}
+  footer{margin-top:30px;font-size:11.5px;color:var(--sub);text-align:center;line-height:1.7;}
+  .err{background:var(--red-soft);color:var(--red);padding:12px 16px;border-radius:10px;font-size:13px;margin-bottom:18px;display:none;}
+  @media(max-width:880px){.kpis{grid-template-columns:repeat(2,1fr);}.grid2{grid-template-columns:1fr;}.fw-grid{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="glyph">🧭</div>
+      <div>
+        <h1>线索罗盘 <span class="en">LEAD COMPASS</span></h1>
+        <div><span class="tag">高客单价低频次 · 线索势能看板</span></div>
+      </div>
+    </div>
+    <div class="meta">
+      数据更新：<b id="mTime">加载中…</b><br>
+      数据源：外呼工作台 leads.json + 回传表统计
+    </div>
+  </header>
+
+  <p class="lead-note">
+    高客单价、低频次的业务（康养套餐、企业服务、财富管理…）成交周期长、月成交仅十几单，
+    <b>用「成交端」指标（CAC、转化率、LTV）衡量会剧烈波动、失去意义</b>。
+    本看板遵循<b>「指标重心前移」</b>原则：把衡量放到<b>线索端 + 管道端</b>——
+    用 CPL、单条线索产值、管道预估金额、营销 ROI 来预判收入，而不是等成交后才统计。
+  </p>
+
+  <div class="err" id="errBox"></div>
+
+  <!-- 可调假设 -->
+  <div class="controls">
+    <div class="ctrl">
+      <label>客单价假设（单条线索对应产值）<b><span id="priceLbl">15.0</span> 万</b></label>
+      <input type="range" id="price" min="5" max="50" step="1" value="15">
+    </div>
+    <div class="ctrl">
+      <label>获客总投入假设（用于算 CPL / ROI）<b><span id="spendLbl">3.0</span> 万</b></label>
+      <input type="range" id="spend" min="0.5" max="30" step="0.5" value="3">
+    </div>
+  </div>
+
+  <!-- KPI -->
+  <div class="kpis">
+    <div class="kpi green"><div class="k">📥 线索总量（在管管道）</div><div class="v" id="kTotal">–</div><div class="hint">当月待跟进工作池</div></div>
+    <div class="kpi amber"><div class="k">⭐ 重点客户</div><div class="v" id="kKey">–</div><div class="hint">已标记重点 / 占比</div></div>
+    <div class="kpi blue"><div class="k">💰 管道预估金额</div><div class="v" id="kPipe">–<small>万</small></div><div class="hint">重点前移：用金额而非笔数</div></div>
+    <div class="kpi blue"><div class="k">📈 单条线索预估产值</div><div class="v" id="kPer">–<small>万</small></div><div class="hint">= 管道金额 ÷ 线索数</div></div>
+    <div class="kpi green"><div class="k">🎯 预计 CPL（单条线索成本）</div><div class="v" id="kCpl">–<small>元</small></div><div class="hint">= 投入 ÷ 线索数</div></div>
+    <div class="kpi green"><div class="k">📊 预计营销 ROI</div><div class="v" id="kRoi">–<small>×</small></div><div class="hint">= 管道金额 ÷ 投入</div></div>
+    <div class="kpi"><div class="k">📨 累计回传（历史）</div><div class="v" id="kRet">–</div><div class="hint">来自回传表统计</div></div>
+    <div class="kpi red"><div class="k">🚫 无效线索（历史）</div><div class="v" id="kInv">–</div><div class="hint">3 次未触达标记</div></div>
+  </div>
+
+  <!-- charts -->
+  <div class="grid2">
+    <div class="panel">
+      <h3>平台分布</h3>
+      <p class="desc">线索来源于哪些渠道——重心前移时，渠道质量比渠道数量更关键</p>
+      <div id="cPlatform" class="chart"></div>
+    </div>
+    <div class="panel">
+      <h3>负责人分布</h3>
+      <p class="desc">在管线索按初步对接人归集，识别产能与负载</p>
+      <div id="cOwner" class="chart"></div>
+    </div>
+    <div class="panel">
+      <h3>月度线索趋势</h3>
+      <p class="desc">按线索时间归集——低频业务看趋势而非单月绝对值</p>
+      <div id="cMonth" class="chart"></div>
+    </div>
+    <div class="panel">
+      <h3>回传构成（累计历史）</h3>
+      <p class="desc">已回传线索中有效 / 无效占比，衡量触达质量</p>
+      <div id="cReturn" class="chart"></div>
+    </div>
+  </div>
+
+  <!-- framework -->
+  <div class="framework">
+    <h2>📐 为什么是「重心前移」</h2>
+    <p class="sub">高客单价低频次业务，指标必须从「成交端」前移到「线索端 + 管道端」</p>
+    <div class="fw-grid">
+      <div class="fw-text">
+        <ul>
+          <li><b>常规业务</b>（电商 / SaaS / 快消）：月成交数百~数千单、客单价几十~几百元 → 用 <b>CAC、转化率、LTV</b>，月度即可稳定统计。</li>
+          <li><b>高客单价低频次</b>（康养 / 企服 / 房产 / 财富）：月成交十几单、客单价 15~30 万 → 成交端指标样本太小、波动剧烈，<b>失去指导意义</b>。</li>
+          <li>于是把重心前移：用 <b>CPL（单条线索成本）</b>、<b>单条线索产值</b>、<b>管道金额 + 管道流速</b>、<b>营销 ROI</b> 在「成交之前」预判收入。</li>
+          <li>统计窗口也从「月度」拉长到 <b>季度 / 半年滚动</b>，平滑低频业务的天然波动。</li>
+        </ul>
+      </div>
+      <div class="fw-svg">
+<!-- 用户提供的「重心前移」对比图，内嵌以说明框架 -->
+<svg viewBox="0 0 680 720" width="100%" role="img" aria-label="高客单价低频次业务与常规业务指标体系对比">
+<title>高客单价低频次 vs 常规业务指标体系差异</title>
+<desc>对比两种业务场景下核心指标的选取差异</desc>
+<defs><marker id="arrow2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<text x="340" y="28" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="500" fill="#2C2C2A">高客单价低频次业务：指标体系需要「重心前移」</text>
+<g><rect x="40" y="50" width="280" height="640" rx="12" fill="#F1EFE8" stroke="#B4B2A9" stroke-width="0.5"/>
+<text x="180" y="78" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="500" fill="#444441">常规业务（高频次·低客单）</text>
+<text x="180" y="98" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#5F5E5A">如：电商、SaaS订阅、快消品</text>
+<line x1="60" y1="112" x2="300" y2="112" stroke="#D3D1C7" stroke-width="0.5"/>
+<text x="60" y="134" font-family="sans-serif" font-size="12" font-weight="500" fill="#5F5E5A">核心指标</text>
+<text x="60" y="158" font-family="sans-serif" font-size="12" fill="#444441">CAC = 总投入 / 成交客户数</text>
+<text x="60" y="178" font-family="sans-serif" font-size="11" fill="#888780">成交量大，月均几百单，CAC稳定</text>
+<text x="60" y="208" font-family="sans-serif" font-size="12" fill="#444441">转化率 = 成交数 / 线索数</text>
+<text x="60" y="228" font-family="sans-serif" font-size="11" fill="#888780">分母分子都大，比率有意义</text>
+<text x="60" y="258" font-family="sans-serif" font-size="12" fill="#444441">LTV / CAC 健康线 ≥ 3:1</text>
+<text x="60" y="278" font-family="sans-serif" font-size="11" fill="#888780">客户多，LTV统计可行</text>
+<text x="60" y="308" font-family="sans-serif" font-size="12" fill="#444441">ROI = 收入 / 投入</text>
+<text x="60" y="328" font-family="sans-serif" font-size="11" fill="#888780">月度即可算，波动小</text>
+<line x1="60" y1="352" x2="300" y2="352" stroke="#D3D1C7" stroke-width="0.5"/>
+<text x="180" y="376" text-anchor="middle" font-family="sans-serif" font-size="12" font-weight="500" fill="#5F5E5A">指标重心</text>
+<rect x="70" y="390" width="220" height="36" rx="6" fill="#E1F5EE" stroke="#5DCAA5" stroke-width="0.5"/>
+<text x="180" y="412" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#0F6E56">以「成交端」为核心</text>
+<text x="60" y="452" font-family="sans-serif" font-size="11" fill="#888780">关注：CAC、转化率、LTV</text>
+<text x="60" y="472" font-family="sans-serif" font-size="11" fill="#888780">每月成交量大 → 统计稳定</text>
+<text x="60" y="502" font-family="sans-serif" font-size="11" fill="#888780">线索端指标为辅：</text>
+<text x="60" y="522" font-family="sans-serif" font-size="11" fill="#888780">CPL、响应率等</text>
+<text x="60" y="552" font-family="sans-serif" font-size="11" fill="#888780">管道金额可预测性低</text>
+<text x="60" y="572" font-family="sans-serif" font-size="11" fill="#888780">（成交快，不需要管道预测）</text>
+<line x1="60" y1="596" x2="300" y2="596" stroke="#D3D1C7" stroke-width="0.5"/>
+<text x="180" y="620" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#888780">月成交：数百~数千单</text>
+<text x="180" y="640" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#888780">客单价：几十~几百元</text>
+<text x="180" y="660" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#888780">统计窗口：月度即可</text></g>
+<g><rect x="360" y="50" width="280" height="640" rx="12" fill="#E6F1FB" stroke="#85B7EB" stroke-width="0.5"/>
+<text x="500" y="78" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="500" fill="#0C447C">高客单价低频次业务</text>
+<text x="500" y="98" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#185FA5">如：康养套餐、企业服务、房产、财富管理</text>
+<line x1="380" y1="112" x2="620" y2="112" stroke="#B5D4F4" stroke-width="0.5"/>
+<text x="380" y="134" font-family="sans-serif" font-size="12" font-weight="500" fill="#185FA5">核心指标（重心前移）</text>
+<text x="380" y="158" font-family="sans-serif" font-size="12" fill="#0C447C">CPL = 总投入 / 线索数</text>
+<text x="380" y="178" font-family="sans-serif" font-size="11" fill="#185FA5">线索量大(月百条+)，CPL稳定</text>
+<text x="380" y="208" font-family="sans-serif" font-size="12" fill="#0C447C">单条线索产值 = 成交额 / 线索数</text>
+<text x="380" y="228" font-family="sans-serif" font-size="11" fill="#185FA5">用金额而非笔数衡量效率</text>
+<text x="380" y="258" font-family="sans-serif" font-size="12" fill="#0C447C">管道金额 + 管道流速</text>
+<text x="380" y="278" font-family="sans-serif" font-size="11" fill="#185FA5">成交周期长，管道可预测收入</text>
+<text x="380" y="308" font-family="sans-serif" font-size="12" fill="#0C447C">营销ROI = 成交额 / 投入</text>
+<text x="380" y="328" font-family="sans-serif" font-size="11" fill="#185FA5">按季度/半年滚动平滑波动</text>
+<line x1="380" y1="352" x2="620" y2="352" stroke="#B5D4F4" stroke-width="0.5"/>
+<text x="500" y="376" text-anchor="middle" font-family="sans-serif" font-size="12" font-weight="500" fill="#185FA5">指标重心</text>
+<rect x="390" y="390" width="220" height="36" rx="6" fill="#E6F1FB" stroke="#378ADD" stroke-width="0.5"/>
+<text x="500" y="412" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#0C447C">以「线索端 + 管道端」为核心</text>
+<text x="380" y="452" font-family="sans-serif" font-size="11" fill="#185FA5">关注：CPL、单条线索产值</text>
+<text x="380" y="472" font-family="sans-serif" font-size="11" fill="#185FA5">月成交十几单 → 成交端不稳定</text>
+<text x="380" y="502" font-family="sans-serif" font-size="11" fill="#185FA5">成交端指标为辅：</text>
+<text x="380" y="522" font-family="sans-serif" font-size="11" fill="#185FA5">CAC按季度滚动、转化率按季度</text>
+<text x="380" y="552" font-family="sans-serif" font-size="11" fill="#185FA5">管道金额可预测性高</text>
+<text x="380" y="572" font-family="sans-serif" font-size="11" fill="#185FA5">（意向客户→管道→预测收入）</text>
+<line x1="380" y1="596" x2="620" y2="596" stroke="#B5D4F4" stroke-width="0.5"/>
+<text x="500" y="620" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#185FA5">月成交：十几单</text>
+<text x="500" y="640" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#185FA5">客单价：15万~30万</text>
+<text x="500" y="660" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#185FA5">统计窗口：季度/半年滚动</text></g>
+<path d="M326 370 L354 370" fill="none" stroke="#888780" stroke-width="1.5" marker-end="url(#arrow2)"/>
+</svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- table -->
+  <div class="tablecard">
+    <div class="thead">
+      <h3>📋 在管线索明细</h3>
+      <input class="search" id="search" placeholder="搜索客户名 / 平台 / 负责人…">
+    </div>
+    <div style="overflow:auto;max-height:460px;">
+      <table>
+        <thead><tr><th>客户</th><th>平台</th><th>负责人</th><th>重点</th><th>已合作</th><th>线索时间</th></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <footer>
+    线索罗盘 · Lead Compass ｜ 数据来自外呼工作台每日同步（leads.json）与回传表统计（returned_stats.json）<br>
+    客单价 / 获客投入为可调假设，用于演示「指标重心前移」下的管道预估与 ROI 测算；真实成交额以回传表为准。
+  </footer>
+</div>
+
+<script>
+const PALETTE = ['#1F9D74','#2E7FD6','#E0922B','#7C6BD6','#D9544D','#3FB6A8','#C0568F','#5B8C5A','#E0B12B','#4A7AB5'];
+let LEADS=[], STATS=null, RETURNED={};
+let priceWan=15, spendWan=3;
+
+function fmtInt(n){return (n||0).toLocaleString('zh-CN');}
+function groupCount(arr,key){
+  const m={};
+  arr.forEach(x=>{const k=(x[key]||'未填写').trim()||'未填写'; m[k]=(m[k]||0)+1;});
+  return Object.entries(m).sort((a,b)=>b[1]-a[1]);
+}
+function monthOf(ms){
+  if(!ms) return '未知';
+  const n=parseInt(ms); if(isNaN(n)) return '未知';
+  const d=new Date(n>1e12?n:n*1000);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+}
+
+async function load(){
+  try{ LEADS=await (await fetch('./leads.json?_='+Date.now())).json(); }catch(e){ LEADS=[]; showErr('无法加载 leads.json（请通过部署后的网址打开，本地直接打开文件可能受浏览器跨域限制）'); }
+  try{ STATS=await (await fetch('./returned_stats.json?_='+Date.now())).json(); }catch(e){ STATS=null; }
+  try{ RETURNED=await (await fetch('./returned.json?_='+Date.now())).json(); }catch(e){ RETURNED={}; }
+  const t=(STATS&&STATS.generated_at)?STATS.generated_at:(LEADS[0]?monthOf(LEADS[0].time):'—');
+  document.getElementById('mTime').textContent = STATS&&STATS.generated_at ? STATS.generated_at : (LEADS.length?('leads '+LEADS.length+' 条'):'—');
+  render();
+}
+function showErr(m){const b=document.getElementById('errBox'); b.style.display='block'; b.textContent=m;}
+
+function render(){
+  const total=LEADS.length;
+  const keyArr=LEADS.filter(l=>l.is_key && l.is_key!=='否');
+  const coopArr=LEADS.filter(l=>l.is_cooperating && l.is_cooperating!=='否');
+  const key=keyArr.length, coop=coopArr.length;
+  const pipeline=total*priceWan;                 // 万
+  const perLead=total?priceWan:0;               // 万
+  const cpl=total? (spendWan*10000/total):0;     // 元
+  const roi=spendWan? (pipeline/spendWan):0;
+  const retTotal=STATS?STATS.total_returned||0:0;
+  const invalid=STATS?STATS.invalid||0:0;
+
+  document.getElementById('kTotal').textContent=fmtInt(total);
+  document.getElementById('kKey').innerHTML=fmtInt(key)+' <small style="font-size:12px;color:var(--sub)">/ '+((total)?Math.round(key/total*100):0)+'%</small>';
+  document.getElementById('kPipe').innerHTML=fmtInt(pipeline)+'<small>万</small>';
+  document.getElementById('kPer').innerHTML=perLead.toFixed(1)+'<small>万</small>';
+  document.getElementById('kCpl').innerHTML=fmtInt(Math.round(cpl))+'<small>元</small>';
+  document.getElementById('kRoi').innerHTML=roi.toFixed(1)+'<small>×</small>';
+  document.getElementById('kRet').textContent=fmtInt(retTotal);
+  document.getElementById('kInv').textContent=fmtInt(invalid);
+
+  renderPlatform(); renderOwner(); renderMonth(); renderReturn(); renderTable();
+}
+
+let charts={};
+function chart(id){ if(!charts[id]) charts[id]=echarts.init(document.getElementById(id)); return charts[id]; }
+function renderPlatform(){
+  const d=groupCount(LEADS,'platform');
+  chart('cPlatform').setOption({
+    tooltip:{trigger:'item'}, legend:{bottom:0,type:'scroll',textStyle:{fontSize:11}},
+    series:[{type:'pie',radius:['42%','68%'],center:['50%','46%'],
+      data:d.map((x,i)=>({name:x[0],value:x[1],itemStyle:{color:PALETTE[i%PALETTE.length]}})),
+      label:{formatter:'{b}\n{c}'}}]
+  });
+}
+function renderOwner(){
+  const d=groupCount(LEADS,'owner_name').slice(0,12);
+  chart('cOwner').setOption({
+    tooltip:{trigger:'axis'}, grid:{left:8,right:18,top:10,bottom:8,containLabel:true},
+    xAxis:{type:'value'}, yAxis:{type:'category',data:d.map(x=>x[0]).reverse(),axisLabel:{fontSize:11}},
+    series:[{type:'bar',data:d.map(x=>x[1]).reverse(),itemStyle:{color:'#2E7FD6',borderRadius:[0,4,4,0]},
+      label:{show:true,position:'right',fontSize:11}}]
+  });
+}
+function renderMonth(){
+  const m={};
+  LEADS.forEach(l=>{const k=monthOf(l.time); m[k]=(m[k]||0)+1;});
+  const keys=Object.keys(m).filter(k=>k!=='未知').sort();
+  if(m['未知']) keys.push('未知');
+  chart('cMonth').setOption({
+    tooltip:{trigger:'axis'}, grid:{left:8,right:14,top:10,bottom:8,containLabel:true},
+    xAxis:{type:'category',data:keys,axisLabel:{fontSize:11}}, yAxis:{type:'value'},
+    series:[{type:'bar',data:keys.map(k=>m[k]),itemStyle:{color:'#1F9D74',borderRadius:[4,4,0,0]},
+      label:{show:true,position:'top',fontSize:11}}]
+  });
+}
+function renderReturn(){
+  const valid=STATS?STATS.valid||0:0;
+  const invalid=STATS?STATS.invalid||0:0;
+  chart('cReturn').setOption({
+    tooltip:{trigger:'item'}, legend:{bottom:0,textStyle:{fontSize:11}},
+    series:[{type:'pie',radius:['42%','68%'],center:['50%','46%'],
+      data:[{name:'有效回传',value:valid,itemStyle:{color:'#1F9D74'}},
+            {name:'无效线索',value:invalid,itemStyle:{color:'#D9544D'}}],
+      label:{formatter:'{b}\n{c}'}}]
+  });
+}
+function renderTable(){
+  const q=(document.getElementById('search').value||'').trim().toLowerCase();
+  const rows=LEADS.filter(l=>{
+    if(!q) return true;
+    return [l.account_name,l.platform,l.owner_name].join(' ').toLowerCase().includes(q);
+  }).slice().sort((a,b)=>parseInt(b.time||0)-(parseInt(a.time||0)||0));
+  const tb=document.getElementById('tbody');
+  if(rows.length===0){ tb.innerHTML='<tr><td colspan="6" class="empty">无匹配线索</td></tr>'; return; }
+  tb.innerHTML=rows.map(l=>{
+    const kp=l.is_key&&l.is_key!=='否'?'<span class="pill key">重点</span>':'<span class="pill no">—</span>';
+    const cp=l.is_cooperating&&l.is_cooperating!=='否'?'<span class="pill coop">已合作</span>':'<span class="pill no">—</span>';
+    return `<tr><td>${l.account_name||'—'}</td><td>${l.platform||'—'}</td><td>${l.owner_name||'—'}</td><td>${kp}</td><td>${cp}</td><td>${monthOf(l.time)}</td></tr>`;
+  }).join('');
+}
+
+document.getElementById('price').addEventListener('input',e=>{priceWan=+e.target.value;document.getElementById('priceLbl').textContent=priceWan.toFixed(1);render();});
+document.getElementById('spend').addEventListener('input',e=>{spendWan=+e.target.value;document.getElementById('spendLbl').textContent=spendWan.toFixed(1);render();});
+document.getElementById('search').addEventListener('input',renderTable);
+window.addEventListener('resize',()=>{Object.values(charts).forEach(c=>c.resize());});
+
+if(typeof echarts==='undefined'){
+  showErr('图表库 ECharts 加载失败，请检查网络后刷新（KPI 与表格仍可正常显示）。');
+}
+load();
+</script>
+</body>
+</html>
