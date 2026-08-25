@@ -1,16 +1,16 @@
 {
-  "generated_at": "2026-08-24",
-  "total_returned": 52,
-  "valid": 51,
+  "generated_at": "2026-08-25",
+  "total_returned": 53,
+  "valid": 52,
   "invalid": 1,
   "by_month": {
-    "2026-08": 52
+    "2026-08": 53
   },
   "by_owner": {
     "一茹": 4,
     "李令潇": 4,
     "任一鑫": 20,
     "田雨": 8,
-    "谢超": 16
+    "谢超": 17
   }
 }
