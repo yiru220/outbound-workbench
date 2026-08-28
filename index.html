@@ -1974,7 +1974,10 @@ async function login() {
   localStorage.setItem('outbound_leads_sig', leadsSig);
 
   const me = (currentUser || '').trim();
-  leads = (data || []).filter(l => (l.owner_name || '').trim() === me);
+  // 宽松匹配：比较前去掉姓名里的括号备注（如「宋磊(海潮)」→「宋磊」），
+  // 解决 user_map 显示名（宋磊(海潮)）与智能表 userName（宋磊）不一致导致的登录后空列表。
+  const norm = s => (s || '').trim().split('(')[0].trim();
+  leads = (data || []).filter(l => norm(l.owner_name) === norm(me));
   await restoreReturned();  // 跨设备恢复已回传状态（灰显 + 禁用按钮）
   updateStats();
   renderLeads();
