@@ -121,6 +121,11 @@
     margin-bottom: 6px;
   }
   .lead-card .name { font-size: 15px; font-weight: 600; }
+  .lead-card .tags { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .lead-card .biz-line {
+    font-size: 11px; color: #0F6E56; background: #E1F5EE;
+    padding: 2px 8px; border-radius: 4px; white-space: nowrap;
+  }
   .lead-card .platform {
     font-size: 11px; color: var(--primary);
     background: var(--primary-light); padding: 2px 8px; border-radius: 4px;
@@ -577,6 +582,11 @@
     <div class="search-bar">
       <input type="text" id="searchInput" placeholder="搜索姓名/手机号/平台...">
     </div>
+    <div class="filter-bar" id="bizFilterWrap" style="display:none;padding:0 12px 8px;">
+      <select id="bizFilter" onchange="renderLeads()" style="width:100%;padding:6px 8px;border-radius:8px;border:1px solid #d9e2ec;font-size:13px;background:#fff;color:#1f2d3d;cursor:pointer;">
+        <option value="">全部业务线</option>
+      </select>
+    </div>
     <div class="lead-list" id="leadList"></div>
   </aside>
 
@@ -652,7 +662,7 @@ const WEBHOOK_FIELDS = {
 };
 
 // 版本号：每次部署刷新一次，方便确认浏览器是否吃到最新版
-const APP_VERSION = '2026-08-28a';
+const APP_VERSION = '2026-09-02a';
 
 // ========== Team ==========
 const TEAM = ['一茹','赵云峰','皇甫毅','孙德国','蔡东辉','郑毅','黄佳佳','李熙怡','任一鑫','党凤梅','罗姣','李令潇','叶艳红','宋磊','张浩然','董超','谢超','田雨'];
@@ -1978,10 +1988,24 @@ async function login() {
   // 解决 user_map 显示名（宋磊(海潮)）与智能表 userName（宋磊）不一致导致的登录后空列表。
   const norm = s => (s || '').trim().split('(')[0].trim();
   leads = (data || []).filter(l => norm(l.owner_name) === norm(me));
+  populateBizFilter();      // 业务线筛选下拉：按当前登录人可见线索去重填充
   await restoreReturned();  // 跨设备恢复已回传状态（灰显 + 禁用按钮）
   updateStats();
   renderLeads();
   renderMain();
+}
+
+// 业务线筛选下拉：收集当前可见线索中不同的 business_line，去重后填充选项。
+// 仅 1 个（或都空）时隐藏筛选器（无意义）；≥2 个时才显示，避免多余 UI。
+function populateBizFilter() {
+  const wrap = document.getElementById('bizFilterWrap');
+  const sel = document.getElementById('bizFilter');
+  if (!wrap || !sel) return;
+  const vals = [...new Set(leads.map(l => (l.business_line || '').trim()).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">全部业务线</option>' +
+    vals.map(v => `<option value="${v}">${v}</option>`).join('');
+  sel.value = '';  // 重置为「全部」
+  wrap.style.display = vals.length >= 2 ? 'block' : 'none';
 }
 
 // 从云端 returned.json 恢复「已回传」状态：换电脑 / 清缓存后也能正确显示灰显与禁用。
@@ -2077,9 +2101,13 @@ function updateStats() {
 
 function renderLeads() {
   const search = (document.getElementById('searchInput').value || '').toLowerCase();
+  const bizEl = document.getElementById('bizFilter');
+  const biz = bizEl ? (bizEl.value || '') : '';   // 业务线筛选：''=全部
   const filtered = leads.filter(l => {
+    if (biz && (l.business_line || '') !== biz) return false;
     if (!search) return true;
-    return (l.name + l.phone + l.account_name + l.platform + l.feedback).toLowerCase().includes(search);
+    return ((l.name || '') + l.phone + (l.account_name || '') + (l.platform || '')
+            + (l.business_line || '') + (l.feedback || '')).toLowerCase().includes(search);
   });
 
   const container = document.getElementById('leadList');
@@ -2095,7 +2123,10 @@ function renderLeads() {
       <div class="lead-card ${isActive ? 'active' : ''} ${leadReached[l.record_id] ? 'reached' : ''}" data-rid="${l.record_id}" onclick="selectLead('${l.record_id}')">
         <div class="row1">
           <span class="name">${l.name || l.account_name || '未命名'}</span>
-          <span class="platform">${l.platform || ''}</span>
+          <span class="tags">
+            ${l.business_line ? `<span class="biz-line">${l.business_line}</span>` : ''}
+            ${l.platform ? `<span class="platform">${l.platform}</span>` : ''}
+          </span>
         </div>
         <div class="row2">
           <span class="phone">${l.phone || '无号码'}</span>
@@ -2320,6 +2351,7 @@ function renderMain() {
             </div>
           </div>
           <div style="display:flex;gap:20px;margin-top:12px;">
+            <div><div class="label">业务线</div><div class="value" style="font-size:13px;">${l.business_line || '-'}</div></div>
             <div><div class="label">平台</div><div class="value" style="font-size:13px;">${l.platform || '-'}</div></div>
             <div><div class="label">线索时间</div><div class="value" style="font-size:13px;">${leadTimeStr}</div></div>
           </div>
